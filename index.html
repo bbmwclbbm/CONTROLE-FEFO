@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Controle FEFO</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#f5f6f4; --surface:#ffffff; --surface-2:#f0f1ee; --text:#1c1e1b; --text-secondary:#5c5f58;
+  --text-muted:#8a8d85; --border:#e0e1dc; --border-strong:#c9cbc3; --accent:#1f4e78; --accent-text:#0c2c45;
+  --accent-bg:#e6eef5; --danger:#a32d2d; --danger-bg:#fcebeb; --amber:#854f0b; --amber-bg:#faeeda;
+  --yellow:#7a6100; --yellow-bg:#fbf4d8; --blue:#185fa5; --blue-bg:#e6f1fb; --green:#27500a; --green-bg:#eaf3de;
+  --gray-bg:#eceae3; --ok:#27500a; --ok-bg:#eaf3de; --warn:#854f0b; --warn-bg:#faeeda;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16181a; --surface:#1f2123; --surface-2:#26282a; --text:#eceeec; --text-secondary:#aeb1ab;
+    --text-muted:#82857f; --border:#34363a; --border-strong:#46484c; --accent:#7fb0e0; --accent-text:#d6e8fa;
+    --accent-bg:#0c2c45; --danger:#f7c1c1; --danger-bg:#501313; --amber:#fac775; --amber-bg:#412402;
+    --yellow:#f5e08a; --yellow-bg:#4a3d00; --blue:#85b7eb; --blue-bg:#042c53; --green:#97c459; --green-bg:#173404;
+    --gray-bg:#2c2c2a; --ok:#97c459; --ok-bg:#173404; --warn:#fac775; --warn-bg:#412402;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16181a; --surface:#1f2123; --surface-2:#26282a; --text:#eceeec; --text-secondary:#aeb1ab;
+  --text-muted:#82857f; --border:#34363a; --border-strong:#46484c; --accent:#7fb0e0; --accent-text:#d6e8fa;
+  --accent-bg:#0c2c45; --danger:#f7c1c1; --danger-bg:#501313; --amber:#fac775; --amber-bg:#412402;
+  --yellow:#f5e08a; --yellow-bg:#4a3d00; --blue:#85b7eb; --blue-bg:#042c53; --green:#97c459; --green-bg:#173404;
+  --gray-bg:#2c2c2a; --ok:#97c459; --ok-bg:#173404; --warn:#fac775; --warn-bg:#412402;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;}
+body{padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0) 0;}
+.wrap{max-width:1400px;margin:0 auto;padding:20px 16px 60px;}
+h1{font-size:20px;font-weight:600;margin:0 0 2px;}
+.subtitle{color:var(--text-secondary);font-size:13px;margin:0 0 18px;}
+h2.section-title{font-size:14px;font-weight:600;margin:0 0 10px;}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
+.card .label{font-size:11.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;}
+.card .value{font-size:19px;font-weight:600;margin-top:4px;}
+.card.crit .value{color:var(--danger);}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;}
+.toolbar select, .toolbar input[type=text]{
+  background:var(--surface);color:var(--text);border:1px solid var(--border-strong);border-radius:8px;
+  padding:7px 10px;font-size:13px;
+}
+.toolbar input[type=text]{min-width:180px;flex:1 1 180px;}
+button{
+  background:var(--surface);color:var(--text);border:1px solid var(--border-strong);border-radius:8px;
+  padding:7px 12px;font-size:13px;cursor:pointer;
+}
+button:hover{background:var(--surface-2);}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+button.primary:hover{opacity:.9;}
+button.danger-btn{color:var(--danger);}
+button:disabled{opacity:.5;cursor:not-allowed;}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 6px;}
+.legend-hint{font-size:11.5px;color:var(--text-muted);margin:0 0 8px;}
+.chip{
+  display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:5px 10px;border-radius:20px;
+  border:1px solid var(--border-strong);background:var(--surface);color:var(--text-secondary);cursor:pointer;
+}
+.chip:hover{background:var(--surface-2);}
+.chip.active{background:var(--surface-2);color:var(--text);border-color:var(--chip-color, var(--border-strong));font-weight:600;}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+.tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface);}
+table{border-collapse:collapse;width:100%;min-width:1180px;font-size:13px;}
+th{
+  background:var(--surface-2);color:var(--text-secondary);font-weight:600;font-size:11.5px;
+  text-transform:uppercase;letter-spacing:.02em;text-align:left;padding:9px 8px;border-bottom:1px solid var(--border);
+  white-space:nowrap;position:sticky;top:0;
+}
+td{padding:5px 8px;border-bottom:1px solid var(--border);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+td input, td select{
+  width:100%;background:transparent;border:1px solid transparent;border-radius:6px;color:var(--text);
+  font-size:13px;padding:5px 6px;
+}
+td input:hover, td select:hover{border-color:var(--border-strong);}
+td input:focus, td select:focus{border-color:var(--accent);outline:none;background:var(--surface);}
+td.produto input{min-width:220px;}
+td.num input{text-align:right;width:80px;}
+td.readonly{text-align:right;color:var(--text-secondary);white-space:nowrap;font-variant-numeric:tabular-nums;}
+td.rm{text-align:center;}
+td.rm button{border:none;background:transparent;color:var(--text-muted);font-size:15px;padding:2px 6px;}
+td.rm button:hover{color:var(--danger);background:var(--danger-bg);border-radius:6px;}
+tfoot td{font-weight:600;background:var(--surface-2);border-top:2px solid var(--border-strong);border-bottom:none;}
+tfoot td.readonly{color:var(--text);}
+.band-vencido{background:var(--danger-bg);}
+.band-b0{background:var(--danger-bg);}
+.band-b1{background:var(--amber-bg);}
+.band-b2{background:var(--yellow-bg);}
+.band-b3{background:var(--blue-bg);}
+.band-b4{background:var(--green-bg);}
+.band-b5{background:transparent;}
+.band-sem{background:transparent;}
+.dias-cell{display:flex;align-items:center;gap:6px;}
+.dias-cell input{width:56px!important;flex:none;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;}
+.panel.collapsed{display:none;}
+textarea{
+  width:100%;min-height:110px;background:var(--surface-2);color:var(--text);border:1px solid var(--border-strong);
+  border-radius:8px;padding:8px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;resize:vertical;
+}
+.hint{font-size:12px;color:var(--text-secondary);margin:6px 0 10px;line-height:1.5;}
+.actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.foot-note{font-size:11.5px;color:var(--text-muted);margin-top:14px;line-height:1.6;}
+.empty{padding:30px;text-align:center;color:var(--text-muted);font-size:13px;}
+.filerow{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.filerow:last-child{border-bottom:none;}
+.filerow .fname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.filerow select{background:var(--surface-2);color:var(--text);border:1px solid var(--border-strong);border-radius:6px;padding:4px 8px;font-size:12.5px;}
+.uploadbox{border:1.5px dashed var(--border-strong);border-radius:10px;padding:16px;text-align:center;font-size:13px;color:var(--text-secondary);cursor:pointer;}
+.uploadbox:hover{background:var(--surface-2);}
+.uploadbox input{display:none;}
+.cols-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:10px;}
+.cols-grid label{display:block;font-size:11.5px;color:var(--text-muted);margin-bottom:3px;}
+.cols-grid input{width:100%;background:var(--surface-2);color:var(--text);border:1px solid var(--border-strong);border-radius:6px;padding:6px 8px;font-size:13px;}
+details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);margin-top:6px;}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;}
+.badge.ok{background:var(--ok-bg);color:var(--ok);}
+.badge.warn{background:var(--warn-bg);color:var(--warn);}
+.badge.bad{background:var(--danger-bg);color:var(--danger);}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media (max-width:760px){.two-col{grid-template-columns:1fr;}}
+.filial-summary{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12.5px;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.filial-summary th{background:var(--surface-2);color:var(--text-secondary);font-weight:600;text-align:left;padding:7px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.02em;}
+.filial-summary td{padding:7px 12px;border-top:1px solid var(--border);}
+.filial-summary td.num, .filial-summary th.num{text-align:right;}
+.filial-summary tr.grand td{font-weight:600;background:var(--surface-2);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Controle FEFO</h1>
+  <p class="subtitle">Custo (+ICMS), preco de venda e margem por item. Ordenado por dias a vencer.</p>
+
+  <div class="cards" id="cards"></div>
+  <div id="filialSummary"></div>
+
+  <div class="toolbar">
+    <button class="primary" id="btnToggleImport">Importar arquivos (8080 + 8211)</button>
+    <button id="btnAdd">+ Novo item</button>
+    <button id="btnPaste">Colar dados</button>
+    <button id="btnExportCsv">Exportar CSV</button>
+    <button id="btnBackup">Backup (JSON)</button>
+    <button id="btnRestore">Restaurar backup</button>
+    <button class="danger-btn" id="btnClear">Limpar tudo</button>
+  </div>
+
+  <div class="panel collapsed" id="importPanel">
+    <h2 class="section-title">Importar rotina 8080 ou 1707 (validade) + rotina 8211 (custo/venda)</h2>
+    <p class="hint">
+      Envie os arquivos Excel exportados da rotina de validade (8080 ou 1707) e da rotina 8211. O formato do
+      arquivo de validade e detectado automaticamente. O cruzamento e feito pelo codigo do produto: cada item
+      e localizado nos arquivos do 8211 pra puxar automaticamente o custo (+ICMS) e o preco de venda. A
+      rotina 1707 nao traz a unidade (KG/UN) nem a filial por coluna - a unidade entra como KG por padrao
+      (ajustavel depois na tabela) e a filial e a que voce marcar em cada arquivo do 8211, ja que o export da
+      1707 e feito filtrando uma filial por vez.
+    </p>
+    <div class="two-col">
+      <div>
+        <label class="hint" style="margin:0 0 6px;display:block;font-weight:600;color:var(--text)">Arquivos 8211 (custo + venda)</label>
+        <label class="uploadbox">
+          Clique ou arraste arquivo(s) 8211 aqui (.xls/.xlsx)
+          <input type="file" id="fileCusto" accept=".xls,.xlsx" multiple>
+        </label>
+        <div id="listCusto"></div>
+        <details>
+          <summary>Opcoes avancadas (colunas do 8211)</summary>
+          <div class="cols-grid">
+            <div><label>Col. produto (0=A)</label><input type="number" id="colCustoProd" value="0"></div>
+            <div><label>Col. custo +ICMS</label><input type="number" id="colCustoValor" value="12"></div>
+            <div><label>Col. preco venda</label><input type="number" id="colVendaValor" value="14"></div>
+          </div>
+        </details>
+      </div>
+      <div>
+        <label class="hint" style="margin:0 0 6px;display:block;font-weight:600;color:var(--text)">Arquivos de validade (rotina 8080 ou 1707)</label>
+        <label class="uploadbox">
+          Clique ou arraste arquivo(s) 8080 ou 1707 aqui (.xls/.xlsx)
+          <input type="file" id="fileFefo" accept=".xls,.xlsx" multiple>
+        </label>
+        <div id="listFefo"></div>
+        <details>
+          <summary>Opcoes avancadas (colunas - deixe em branco pra detectar automatico)</summary>
+          <div class="hint" style="margin:6px 0">Rotina 8080 (produto e descricao juntos numa coluna so):</div>
+          <div class="cols-grid">
+            <div><label>Col. produto</label><input type="number" id="colFefoProd" placeholder="auto"></div>
+            <div><label>Col. unidade</label><input type="number" id="colFefoUn" placeholder="auto"></div>
+          </div>
+          <div class="hint" style="margin:10px 0 6px">Rotina 1707 (codigo e descricao em colunas separadas):</div>
+          <div class="cols-grid">
+            <div><label>Col. codigo produto</label><input type="number" id="colFefoCod" placeholder="auto"></div>
+            <div><label>Col. descricao produto</label><input type="number" id="colFefoDesc" placeholder="auto"></div>
+          </div>
+          <div class="hint" style="margin:10px 0 6px">Comuns aos dois formatos:</div>
+          <div class="cols-grid">
+            <div><label>Col. quantidade</label><input type="number" id="colFefoQtd" placeholder="auto"></div>
+            <div><label>Col. dias a vencer</label><input type="number" id="colFefoDias" placeholder="auto"></div>
+            <div><label>Col. validade</label><input type="number" id="colFefoValid" placeholder="auto"></div>
+          </div>
+        </details>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="btnProcessar">Processar e pre-visualizar</button>
+      <button id="btnImportCancel">Cancelar</button>
+    </div>
+    <div id="importMsg" class="hint"></div>
+  </div>
+
+  <div class="panel collapsed" id="previewPanel">
+    <h2 class="section-title">Pre-visualizacao do cruzamento</h2>
+    <div id="previewSummary" class="hint"></div>
+    <div class="tablewrap">
+      <table id="previewTable" style="min-width:900px">
+        <thead>
+          <tr>
+            <th>Produto</th><th>Filial</th><th>Un.</th><th>Qtd</th><th>Dias</th><th>Validade</th>
+            <th>Custo +ICMS</th><th>Preco venda</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="previewBody"></tbody>
+      </table>
+    </div>
+    <div class="actions">
+      <button class="primary" id="btnPreviewAppend">Adicionar aos itens atuais</button>
+      <button id="btnPreviewReplace">Substituir tudo</button>
+      <button id="btnPreviewCancel">Cancelar</button>
+    </div>
+  </div>
+
+  <p class="legend-hint">Clique numa ou mais faixas pra filtrar a tabela por dias a vencer:</p>
+  <div class="legend" id="legend"></div>
+
+  <div class="panel collapsed" id="pastePanel">
+    <div class="hint">
+      Cole linhas copiadas do Excel (colunas separadas por TAB), na ordem:<br>
+      <strong>Produto | Filial | Un | Qtd | Dias a Vencer | Validade | Custo | Preco Venda (opcional)</strong>
+    </div>
+    <textarea id="pasteArea" placeholder="Cole aqui..."></textarea>
+    <div class="actions">
+      <button class="primary" id="btnPasteConfirm">Adicionar linhas</button>
+      <button id="btnPasteCancel">Cancelar</button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <select id="filFilial">
+      <option value="">Todas as filiais</option>
+      <option value="1">Filial 1</option>
+      <option value="3">Filial 3</option>
+    </select>
+    <input type="text" id="filBusca" placeholder="Buscar produto...">
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:26%">Produto</th>
+          <th>Filial</th>
+          <th>Un.</th>
+          <th>Qtd</th>
+          <th id="thDias" style="cursor:pointer">Dias a vencer &#8645;</th>
+          <th>Validade</th>
+          <th>Custo +ICMS (R$)</th>
+          <th>Preco venda (R$)</th>
+          <th>Total custo (R$)</th>
+          <th>Total venda (R$)</th>
+          <th>Markup %</th>
+          <th>Margem %</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+      <tfoot>
+        <tr>
+          <td colspan="8" style="text-align:right">Totais (itens filtrados):</td>
+          <td class="readonly" id="footCusto">-</td>
+          <td class="readonly" id="footVenda">-</td>
+          <td class="readonly" id="footMarkup">-</td>
+          <td class="readonly" id="footMargem">-</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <p class="foot-note">
+    Os dados ficam salvos neste navegador (armazenamento local do artefato). Use "Backup (JSON)" de vez em
+    quando pra guardar uma copia - isso permite restaurar os dados em outro computador ou navegador.
+    O cruzamento automatico le os arquivos .xls/.xlsx direto no seu navegador; nada e enviado pra fora.
+  </p>
+</div>
+
+<script>
+(function(){
+  var STORAGE_KEY = 'fefo_tracker_v1';
+  var sortAsc = true;
+  var custoFiles = [];
+  var fefoFiles = [];
+  var previewItems = [];
+
+  var seedItems = [
+    {p:"131147 - LINGUICA CALABRESA FINA RF 4X2,5KG PIFPA",f:"1",u:"KG",q:7.5,d:10,v:"08/10/26",c:14.99,s:null},
+    {p:"117244 - CONTRA FILE GRILL S/NOIX RF+-25KG FRIGOD",f:"1",u:"KG",q:22.83,d:12,v:"10/10/26",c:46.00,s:null},
+    {p:"117246 - LAGARTO RF +-25KG FRIGODIAS",f:"1",u:"KG",q:30.786,d:14,v:"12/10/26",c:32.50,s:null},
+    {p:"131064 - LINGUICA CALABRESA RF 4X2,5KG LANDIM",f:"1",u:"KG",q:50,d:14,v:"12/10/26",c:10.70,s:null},
+    {p:"131034 - LINGUICA SUINA CG 4X5KG ALEGRA",f:"1",u:"KG",q:340,d:14,v:"12/10/26",c:12.98,s:null},
+    {p:"112333 - ALCATRA S/PICANHA RF +-25KG FRIGO DIAS",f:"1",u:"KG",q:8.865,d:15,v:"13/10/26",c:37.50,s:null},
+    {p:"131034 - LINGUICA SUINA CG 4X5KG ALEGRA",f:"1",u:"KG",q:1000,d:15,v:"13/10/26",c:12.98,s:null},
+    {p:"112528 - CONTRA FILE GRILL DI PRIMA RF+-25KG MATA",f:"1",u:"KG",q:21.39,d:19,v:"17/10/26",c:49.00,s:null},
+    {p:"612011 - VODKA CITRUS 6X269ML SCHWEPPES",f:"1",u:"UN",q:6,d:19,v:"17/10/26",c:4.37,s:null},
+    {p:"133019 - SALSICHAO BIG RF 3X2KG PIF PAF",f:"1",u:"KG",q:1834,d:22,v:"20/10/26",c:12.28,s:null},
+    {p:"131158 - LINGUICA SUINA C/QJO COAL RF 20X500G SAN",f:"1",u:"KG",q:40,d:29,v:"27/10/26",c:26.30,s:null},
+    {p:"131157 - LINGUICA SUINA FINA RF 6X2,5KG SANTO AMA",f:"1",u:"KG",q:22.5,d:29,v:"27/10/26",c:21.50,s:null},
+    {p:"144032 - BACON MANTA DEF +-15KG LANDIM",f:"3",u:"KG",q:2.416,d:3,v:"01/10/26",c:20.00,s:null},
+    {p:"221279 - QUEIJO MINAS FRESCAL 10X+-350G LATCO/CR",f:"3",u:"KG",q:6.68,d:3,v:"01/10/26",c:35.34,s:null},
+    {p:"222007 - REQUEIJAO CHEDDAR CP PLAST 12X200G BOIBO",f:"3",u:"UN",q:12,d:3,v:"01/10/26",c:4.09,s:null},
+    {p:"221298 - QUEIJO TIPO GOUDA 12X200G VIGOR",f:"3",u:"KG",q:4.8,d:5,v:"03/10/26",c:78.08,s:null},
+    {p:"221074 - QUEIJO PRATO 6X+-3,5KG CREMOLAT",f:"3",u:"KG",q:462.165,d:8,v:"06/10/26",c:35.89,s:null},
+    {p:"221301 - QUEIJO PROC FAT PRATO 18X140G VIGOR",f:"3",u:"KG",q:30.24,d:8,v:"06/10/26",c:58.48,s:null},
+    {p:"135026 - EMBUTIDO PEITO FGO DEF RF 2X2,6KG OURO P",f:"3",u:"KG",q:2.72,d:9,v:"07/10/26",c:27.82,s:null},
+    {p:"414004 - ALHO DESCASCADO 10X1KG MEGA ALHO",f:"3",u:"KG",q:44,d:10,v:"08/10/26",c:13.30,s:null},
+    {p:"144043 - BACON PERNIL DEF +-20KG ADORAR",f:"3",u:"KG",q:11.97,d:10,v:"08/10/26",c:17.98,s:null},
+    {p:"221302 - QUEIJO GOUDA FORMA 2X+-3KG VIGOR",f:"3",u:"KG",q:25.32,d:11,v:"09/10/26",c:75.16,s:null},
+    {p:"414004 - ALHO DESCASCADO 10X1KG MEGA ALHO",f:"3",u:"KG",q:400,d:12,v:"10/10/26",c:13.30,s:null},
+    {p:"115049 - HAMBURGUER DE COSTELA 18X180G MATURATTA",f:"3",u:"KG",q:463.32,d:12,v:"10/10/26",c:27.16,s:null},
+    {p:"221006 - QJO TP GORGONZ FRAC 12X100G FAIXA AZUL",f:"3",u:"KG",q:4.8,d:12,v:"10/10/26",c:115.30,s:null},
+    {p:"144044 - BACON MANTA RF +-20KG ADORAR",f:"3",u:"KG",q:430.75,d:13,v:"11/10/26",c:22.01,s:null},
+    {p:"221252 - QUEIJO GORGONZOLA FRAC 36X+-167G SAO VIC",f:"3",u:"KG",q:1.39,d:13,v:"11/10/26",c:49.90,s:null},
+    {p:"414004 - ALHO DESCASCADO 10X1KG MEGA ALHO",f:"3",u:"KG",q:96,d:17,v:"15/10/26",c:13.30,s:null},
+    {p:"144056 - BACON MANTA DEF 8X+-2KG GOLDEN PORK",f:"3",u:"KG",q:374.83,d:17,v:"15/10/26",c:18.29,s:null},
+    {p:"221182 - QUEIJO COALHO CHIMICHURRI 12X+-400G CRIO",f:"3",u:"KG",q:4.01,d:18,v:"16/10/26",c:42.84,s:null},
+    {p:"230006 - QUEIJO COALHO ZERO LAC 12X+-340GR CRIOUL",f:"3",u:"KG",q:4.08,d:18,v:"16/10/26",c:46.11,s:null},
+    {p:"221241 - QUEIJO PRATO 6X+-3KG GUTHI",f:"3",u:"KG",q:485.82,d:19,v:"17/10/26",c:34.98,s:null},
+    {p:"221292 - QUEIJO PARMESAO LASCAS 12X150G VIGOR",f:"3",u:"KG",q:158.4,d:20,v:"18/10/26",c:114.62,s:null},
+    {p:"222005 - REQUEIJAO CULINARIO BISNA 4X1,5KG VIGOR",f:"3",u:"UN",q:31,d:20,v:"18/10/26",c:39.22,s:null},
+    {p:"224001 - CREME CULINARIO 12X1KG LECO",f:"3",u:"KG",q:810,d:21,v:"19/10/26",c:12.25,s:null},
+    {p:"422005 - MARGARINA QUALY 6X1KG C/SAL SADIA",f:"3",u:"UN",q:6,d:21,v:"19/10/26",c:13.99,s:null},
+    {p:"222062 - REQUEIJAO BISNAGA 10X1,5KG SAO VICENTE",f:"3",u:"UN",q:325,d:22,v:"20/10/26",c:37.34,s:null},
+    {p:"414004 - ALHO DESCASCADO 10X1KG MEGA ALHO",f:"3",u:"KG",q:400,d:23,v:"21/10/26",c:13.30,s:null},
+    {p:"311067 - BATATA ONDULADA C/CAS 7X2KGBEM BRASIL",f:"3",u:"KG",q:266,d:23,v:"21/10/26",c:10.97,s:null},
+    {p:"311067 - BATATA ONDULADA C/CAS 7X2KGBEM BRASIL",f:"3",u:"KG",q:2100,d:23,v:"21/10/26",c:10.97,s:null},
+    {p:"631024 - GUARAVITA UVA 12X290ML",f:"3",u:"UN",q:2784,d:23,v:"21/10/26",c:0.90,s:null},
+    {p:"221266 - QUEIJO MINAS PADRAO 24X+-250G SAO VICENT",f:"3",u:"KG",q:18.423,d:23,v:"21/10/26",c:46.80,s:null},
+    {p:"125043 - TIRINHAS FRANGO EMPANADO 10X700G LAR",f:"3",u:"KG",q:56,d:23,v:"21/10/26",c:11.27,s:null},
+    {p:"222075 - REQUEIJAO CREMOSO LIGHT CP 12X400G VIGOR",f:"3",u:"UN",q:1982,d:27,v:"25/10/26",c:9.91,s:null},
+    {p:"222047 - CREAM CHEESE LIGHT 12X300G VIGOR",f:"3",u:"UN",q:60,d:28,v:"26/10/26",c:10.22,s:null},
+    {p:"144075 - BACON CUBOS 40X250G SANTO AMARO",f:"3",u:"KG",q:20,d:29,v:"27/10/26",c:28.00,s:null},
+    {p:"445008 - COGUMELO INTEIRO BD 6X2KG ARCOBELLO",f:"3",u:"KG",q:66,d:29,v:"27/10/26",c:29.50,s:null},
+    {p:"221284 - QUEIJO MUSSARELA LACFREE 12X+-500G VERDE",f:"3",u:"KG",q:2.374,d:29,v:"27/10/26",c:44.62,s:null},
+    {p:"131086 - LINGUICA PERNIL GRILL CG 12X1KG PIF PAF",f:"3",u:"KG",q:12,d:30,v:"28/10/26",c:17.68,s:null},
+    {p:"221092 - QUEIJO COALHO C/PIM 12X+-400G LATCO/CRI",f:"3",u:"KG",q:7.94,d:30,v:"28/10/26",c:41.91,s:null},
+    {p:"221294 - QUEIJO PARMESAO FATIA 24X200G VIGOR",f:"3",u:"KG",q:96,d:30,v:"28/10/26",c:78.12,s:null}
+  ];
+
+  function loadItems(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(raw){
+        var parsed = JSON.parse(raw);
+        if(Array.isArray(parsed) && parsed.length) return parsed;
+      }
+    }catch(e){}
+    return seedItems.map(function(it){ return Object.assign({}, it); });
+  }
+
+  var items = loadItems();
+  items.forEach(function(it, idx){ it._id = idx + '-' + Math.random().toString(36).slice(2,8); });
+
+  function saveItems(){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(items.map(stripId))); }catch(e){}
+  }
+  function stripId(it){
+    return {p:it.p,f:it.f,u:it.u,q:it.q,d:it.d,v:it.v,c:it.c,s:it.s};
+  }
+
+  function parseNum(s){
+    if(typeof s === 'number') return s;
+    if(s === undefined || s === null) return null;
+    s = String(s).trim();
+    if(s === '') return null;
+    if(s.indexOf(',') > -1 && s.indexOf('.') > -1){
+      s = s.replace(/\./g,'').replace(',', '.');
+    } else if(s.indexOf(',') > -1){
+      s = s.replace(',', '.');
+    }
+    var n = parseFloat(s);
+    return isNaN(n) ? null : n;
+  }
+
+  var BAND_DEFS = [
+    {key:'vencido', label:'Vencido', varColor:'--danger'},
+    {key:'b0', label:'0-9 dias', varColor:'--danger'},
+    {key:'b1', label:'10-19 dias', varColor:'--amber'},
+    {key:'b2', label:'20-29 dias', varColor:'--yellow'},
+    {key:'b3', label:'30-39 dias', varColor:'--blue'},
+    {key:'b4', label:'40-59 dias', varColor:'--green'},
+    {key:'b5', label:'60+ dias', varColor:'--text-muted'},
+    {key:'sem', label:'Sem dias informado', varColor:'--text-muted'}
+  ];
+  var activeBands = new Set(BAND_DEFS.map(function(b){ return b.key; }));
+
+  function bandKey(dias){
+    if(dias === null || dias === undefined || isNaN(dias)) return 'sem';
+    if(dias < 0) return 'vencido';
+    if(dias <= 9) return 'b0';
+    if(dias <= 19) return 'b1';
+    if(dias <= 29) return 'b2';
+    if(dias <= 39) return 'b3';
+    if(dias <= 59) return 'b4';
+    return 'b5';
+  }
+
+  function fmtMoney(n){
+    if(n === null || n === undefined || isNaN(n)) return '-';
+    return 'R$ ' + n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+
+  function baseFiltered(){
+    var filFilial = document.getElementById('filFilial').value;
+    var busca = document.getElementById('filBusca').value.trim().toLowerCase();
+    return items.filter(function(it){
+      if(filFilial && String(it.f) !== filFilial) return false;
+      if(busca && it.p.toLowerCase().indexOf(busca) === -1) return false;
+      return true;
+    });
+  }
+
+  function getFiltered(){
+    var list = baseFiltered().filter(function(it){ return activeBands.has(bandKey(it.d)); });
+    list.sort(function(a,b){
+      var da = (a.d === null || a.d === undefined) ? 9999 : a.d;
+      var db = (b.d === null || b.d === undefined) ? 9999 : b.d;
+      return sortAsc ? da - db : db - da;
+    });
+    return list;
+  }
+
+  function renderLegend(){
+    var counts = {};
+    BAND_DEFS.forEach(function(b){ counts[b.key] = 0; });
+    baseFiltered().forEach(function(it){ counts[bandKey(it.d)]++; });
+
+    var wrap = document.getElementById('legend');
+    wrap.innerHTML = '';
+    BAND_DEFS.forEach(function(b){
+      var btn = document.createElement('button');
+      var active = activeBands.has(b.key);
+      btn.type = 'button';
+      btn.className = 'chip' + (active ? ' active' : '');
+      btn.style.setProperty('--chip-color', 'var(' + b.varColor + ')');
+      btn.innerHTML = '<span class="dot" style="background:var(' + b.varColor + ')"></span>' + b.label + ' (' + counts[b.key] + ')';
+      btn.addEventListener('click', function(){
+        if(activeBands.has(b.key)) activeBands.delete(b.key); else activeBands.add(b.key);
+        render();
+      });
+      wrap.appendChild(btn);
+    });
+    var btnAll = document.createElement('button');
+    btnAll.type = 'button'; btnAll.className = 'chip'; btnAll.textContent = 'Marcar todas';
+    btnAll.addEventListener('click', function(){ activeBands = new Set(BAND_DEFS.map(function(b){return b.key;})); render(); });
+    wrap.appendChild(btnAll);
+    var btnNone = document.createElement('button');
+    btnNone.type = 'button'; btnNone.className = 'chip'; btnNone.textContent = 'Limpar';
+    btnNone.addEventListener('click', function(){ activeBands = new Set(); render(); });
+    wrap.appendChild(btnNone);
+  }
+
+  function searchAndBandFiltered(){
+    var busca = document.getElementById('filBusca').value.trim().toLowerCase();
+    return items.filter(function(it){
+      if(busca && it.p.toLowerCase().indexOf(busca) === -1) return false;
+      if(!activeBands.has(bandKey(it.d))) return false;
+      return true;
+    });
+  }
+
+  function renderFilialSummary(){
+    var list = searchAndBandFiltered();
+    var groups = {};
+    list.forEach(function(it){
+      var key = it.f || '?';
+      if(!groups[key]) groups[key] = {itens:0, custo:0, venda:0, hasVenda:false};
+      var g = groups[key];
+      g.itens++;
+      g.custo += (it.q||0)*(it.c||0);
+      if(it.s !== null && it.s !== undefined){ g.venda += (it.q||0)*it.s; g.hasVenda = true; }
+    });
+    var keys = Object.keys(groups).sort();
+    var wrap = document.getElementById('filialSummary');
+    if(keys.length <= 1){ wrap.innerHTML = ''; return; }
+    var html = '<table class="filial-summary"><thead><tr>' +
+      '<th>Filial</th><th class="num">Itens</th><th class="num">Custo total</th><th class="num">Venda total</th><th class="num">Markup medio</th>' +
+      '</tr></thead><tbody>';
+    var grandItens = 0, grandCusto = 0, grandVenda = 0, grandHasVenda = false;
+    keys.forEach(function(k){
+      var g = groups[k];
+      grandItens += g.itens; grandCusto += g.custo;
+      if(g.hasVenda){ grandVenda += g.venda; grandHasVenda = true; }
+      var markup = (g.hasVenda && g.custo) ? ((g.venda - g.custo)/g.custo*100).toFixed(1) + '%' : '-';
+      html += '<tr><td>Filial ' + k + '</td><td class="num">' + g.itens + '</td><td class="num">' +
+        fmtMoney(g.custo) + '</td><td class="num">' + (g.hasVenda ? fmtMoney(g.venda) : '-') +
+        '</td><td class="num">' + markup + '</td></tr>';
+    });
+    var markupTotal = (grandHasVenda && grandCusto) ? ((grandVenda - grandCusto)/grandCusto*100).toFixed(1) + '%' : '-';
+    html += '<tr class="grand"><td>Total geral</td><td class="num">' + grandItens + '</td><td class="num">' +
+      fmtMoney(grandCusto) + '</td><td class="num">' + (grandHasVenda ? fmtMoney(grandVenda) : '-') +
+      '</td><td class="num">' + markupTotal + '</td></tr>';
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+  }
+
+  function render(){
+    var tbody = document.getElementById('tbody');
+    var list = getFiltered();
+    tbody.innerHTML = '';
+    if(list.length === 0){
+      var tr = document.createElement('tr');
+      var td = document.createElement('td');
+      td.colSpan = 13; td.className = 'empty';
+      td.textContent = 'Nenhum item nessa selecao. Ajuste os filtros de dias a vencer, filial ou busca.';
+      tr.appendChild(td); tbody.appendChild(tr);
+    }
+    var sumCusto = 0, sumVenda = 0, hasVenda = false;
+    list.forEach(function(it){
+      var tr = document.createElement('tr');
+      tr.className = 'band-' + bandKey(it.d);
+      tr.dataset.id = it._id;
+
+      tr.appendChild(cellInput('produto', it, 'p', 'text'));
+      tr.appendChild(cellSelect(it, 'f', [['1','Filial 1'],['3','Filial 3']]));
+      tr.appendChild(cellSelect(it, 'u', [['KG','KG'],['UN','UN'],['PC','PC']]));
+      tr.appendChild(cellInput('num', it, 'q', 'number'));
+      tr.appendChild(diasCell(it));
+      tr.appendChild(cellInput('', it, 'v', 'text'));
+      tr.appendChild(cellInput('num', it, 'c', 'number'));
+      tr.appendChild(cellInput('num', it, 's', 'number', true));
+
+      var totalCusto = (it.q || 0) * (it.c || 0);
+      var totalVenda = (it.s !== null && it.s !== undefined) ? (it.q || 0) * it.s : null;
+      var temPreco = (it.s !== null && it.s !== undefined && it.c);
+      var markup = temPreco ? ((it.s - it.c) / it.c * 100) : null;
+      var margem = (temPreco && it.s) ? ((it.s - it.c) / it.s * 100) : null;
+
+      sumCusto += totalCusto;
+      if(totalVenda !== null){ sumVenda += totalVenda; hasVenda = true; }
+
+      var tdTC = document.createElement('td'); tdTC.className = 'readonly'; tdTC.textContent = fmtMoney(totalCusto);
+      var tdTV = document.createElement('td'); tdTV.className = 'readonly'; tdTV.textContent = totalVenda === null ? '-' : fmtMoney(totalVenda);
+      var tdMk = document.createElement('td'); tdMk.className = 'readonly'; tdMk.textContent = markup === null ? '-' : markup.toFixed(1) + '%';
+      var tdMg = document.createElement('td'); tdMg.className = 'readonly'; tdMg.textContent = margem === null ? '-' : margem.toFixed(1) + '%';
+      tr.appendChild(tdTC); tr.appendChild(tdTV); tr.appendChild(tdMk); tr.appendChild(tdMg);
+
+      var tdRm = document.createElement('td'); tdRm.className = 'rm';
+      var btnRm = document.createElement('button'); btnRm.textContent = '\u2715'; btnRm.title = 'Remover';
+      btnRm.addEventListener('click', function(){
+        items = items.filter(function(x){ return x._id !== it._id; });
+        saveItems(); render();
+      });
+      tdRm.appendChild(btnRm); tr.appendChild(tdRm);
+
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('footCusto').textContent = fmtMoney(sumCusto);
+    document.getElementById('footVenda').textContent = hasVenda ? fmtMoney(sumVenda) : '-';
+    var markupTotal = (hasVenda && sumCusto) ? ((sumVenda - sumCusto) / sumCusto * 100) : null;
+    var margemTotal = (hasVenda && sumVenda) ? ((sumVenda - sumCusto) / sumVenda * 100) : null;
+    document.getElementById('footMarkup').textContent = markupTotal === null ? '-' : markupTotal.toFixed(1) + '%';
+    document.getElementById('footMargem').textContent = margemTotal === null ? '-' : margemTotal.toFixed(1) + '%';
+
+    renderLegend();
+    renderFilialSummary();
+    renderCards(list);
+  }
+
+  function diasCell(it){
+    var td = document.createElement('td'); td.className = 'num';
+    var wrap = document.createElement('div'); wrap.className = 'dias-cell';
+    var input = document.createElement('input'); input.type = 'number'; input.step = 'any';
+    input.value = (it.d === null || it.d === undefined) ? '' : it.d;
+    input.addEventListener('change', function(){
+      it.d = input.value === '' ? null : parseNum(input.value);
+      saveItems(); render();
+    });
+    wrap.appendChild(input);
+    if(it.d !== null && it.d !== undefined && it.d < 0){
+      var badge = document.createElement('span'); badge.className = 'badge bad'; badge.textContent = 'VENCIDO';
+      wrap.appendChild(badge);
+    }
+    td.appendChild(wrap);
+    return td;
+  }
+
+  function renderCards(list){
+    var totalItens = list.length;
+    var totalCusto = list.reduce(function(s,it){ return s + (it.q||0)*(it.c||0); }, 0);
+    var vencidos = list.filter(function(it){ return it.d !== null && it.d !== undefined && it.d < 0; }).length;
+    var criticos = list.filter(function(it){ return it.d !== null && it.d !== undefined && it.d >= 0 && it.d <= 9; }).length;
+    var comVenda = list.filter(function(it){ return it.s !== null && it.s !== undefined; });
+    var totalVenda = comVenda.reduce(function(s,it){ return s + (it.q||0)*it.s; }, 0);
+
+    var cards = document.getElementById('cards');
+    cards.innerHTML = '';
+    cards.appendChild(makeCard('Itens listados', totalItens, false));
+    cards.appendChild(makeCard('Itens vencidos', vencidos, vencidos > 0));
+    cards.appendChild(makeCard('Itens criticos (0-9 dias)', criticos, criticos > 0));
+    cards.appendChild(makeCard('Valor total (custo)', fmtMoney(totalCusto), false));
+    cards.appendChild(makeCard('Valor total (venda)', comVenda.length ? fmtMoney(totalVenda) : '-', false));
+  }
+  function makeCard(label, value, crit){
+    var div = document.createElement('div'); div.className = 'card' + (crit ? ' crit' : '');
+    var l = document.createElement('div'); l.className = 'label'; l.textContent = label;
+    var v = document.createElement('div'); v.className = 'value'; v.textContent = value;
+    div.appendChild(l); div.appendChild(v);
+    return div;
+  }
+
+  function cellInput(cls, it, field, type, isOptional){
+    var td = document.createElement('td'); if(cls) td.className = cls;
+    var input = document.createElement('input');
+    input.type = type;
+    if(type === 'number') input.step = 'any';
+    var val = it[field];
+    input.value = (val === null || val === undefined) ? '' : val;
+    if(isOptional) input.placeholder = 'opcional';
+    input.addEventListener('change', function(){
+      if(type === 'number'){
+        it[field] = input.value === '' ? null : parseNum(input.value);
+      } else {
+        it[field] = input.value;
+      }
+      saveItems(); render();
+    });
+    td.appendChild(input);
+    return td;
+  }
+  function cellSelect(it, field, options){
+    var td = document.createElement('td');
+    var sel = document.createElement('select');
+    options.forEach(function(opt){
+      var o = document.createElement('option'); o.value = opt[0]; o.textContent = opt[1];
+      if(String(it[field]) === opt[0]) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.addEventListener('change', function(){ it[field] = sel.value; saveItems(); render(); });
+    td.appendChild(sel);
+    return td;
+  }
+
+  document.getElementById('filFilial').addEventListener('change', render);
+  document.getElementById('filBusca').addEventListener('input', render);
+  document.getElementById('thDias').addEventListener('click', function(){ sortAsc = !sortAsc; render(); });
+
+  document.getElementById('btnAdd').addEventListener('click', function(){
+    items.push({_id: 'n-' + Math.random().toString(36).slice(2,8), p:'Novo produto', f:'1', u:'KG', q:0, d:0, v:'', c:0, s:null});
+    saveItems(); render();
+  });
+
+  document.getElementById('btnClear').addEventListener('click', function(){
+    if(confirm('Remover todos os itens da planilha? Esta acao nao pode ser desfeita.')){
+      items = []; saveItems(); render();
+    }
+  });
+
+  document.getElementById('btnPaste').addEventListener('click', function(){
+    document.getElementById('pastePanel').classList.remove('collapsed');
+  });
+  document.getElementById('btnPasteCancel').addEventListener('click', function(){
+    document.getElementById('pastePanel').classList.add('collapsed');
+    document.getElementById('pasteArea').value = '';
+  });
+  document.getElementById('btnPasteConfirm').addEventListener('click', function(){
+    var raw = document.getElementById('pasteArea').value;
+    var lines = raw.split(/\r?\n/).map(function(l){ return l.trim(); }).filter(Boolean);
+    var added = 0;
+    lines.forEach(function(line){
+      var cols = line.split('\t');
+      if(cols.length < 6) cols = line.split(';');
+      if(cols.length < 6) return;
+      var produto = (cols[0]||'').trim();
+      if(!produto) return;
+      items.push({
+        _id: 'n-' + Math.random().toString(36).slice(2,8),
+        p: produto,
+        f: (cols[1]||'1').trim().replace(/[^13]/g,'') || '1',
+        u: (cols[2]||'KG').trim().toUpperCase(),
+        q: parseNum(cols[3]) || 0,
+        d: parseNum(cols[4]) || 0,
+        v: (cols[5]||'').trim(),
+        c: parseNum(cols[6]) || 0,
+        s: cols[7] !== undefined ? parseNum(cols[7]) : null
+      });
+      added++;
+    });
+    document.getElementById('pasteArea').value = '';
+    document.getElementById('pastePanel').classList.add('collapsed');
+    saveItems(); render();
+    alert(added + ' item(ns) adicionado(s).');
+  });
+
+  async function getDownloads(){
+    if(!window.claude || !window.claude.use) return null;
+    try{ return await window.claude.use('downloads'); }catch(e){ return null; }
+  }
+
+  document.getElementById('btnExportCsv').addEventListener('click', async function(){
+    var header = ['Produto','Filial','Un','Qtd','Dias a vencer','Validade','Custo +ICMS','Preco venda','Total custo','Total venda','Markup %','Margem %'];
+    var rows = [header.join(';')];
+    getFiltered().forEach(function(it){
+      var totalCusto = (it.q||0)*(it.c||0);
+      var totalVenda = (it.s !== null && it.s !== undefined) ? (it.q||0)*it.s : '';
+      var temPreco = (it.s !== null && it.s !== undefined && it.c);
+      var markup = temPreco ? ((it.s-it.c)/it.c*100).toFixed(1) : '';
+      var margem = (temPreco && it.s) ? ((it.s-it.c)/it.s*100).toFixed(1) : '';
+      rows.push([it.p, it.f, it.u, it.q, it.d, it.v, it.c, it.s === null ? '' : it.s, totalCusto.toFixed(2), totalVenda === '' ? '' : totalVenda.toFixed(2), markup, margem].join(';'));
+    });
+    var csv = rows.join('\n');
+    var downloads = await getDownloads();
+    if(downloads){
+      await downloads.save({filename: 'controle_validade_fefo.csv', data: csv});
+    } else {
+      var blob = new Blob([csv], {type:'text/csv'});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a'); a.href = url; a.download = 'controle_validade_fefo.csv';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  });
+
+  document.getElementById('btnBackup').addEventListener('click', async function(){
+    var json = JSON.stringify(items.map(stripId), null, 2);
+    var downloads = await getDownloads();
+    if(downloads){
+      await downloads.save({filename: 'fefo_backup.json', data: json});
+    } else {
+      var blob = new Blob([json], {type:'application/json'});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a'); a.href = url; a.download = 'fefo_backup.json';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  });
+
+  document.getElementById('btnRestore').addEventListener('click', function(){
+    var json = prompt('Cole aqui o conteudo do arquivo de backup (JSON):');
+    if(!json) return;
+    try{
+      var parsed = JSON.parse(json);
+      if(!Array.isArray(parsed)) throw new Error('formato invalido');
+      items = parsed.map(function(it, idx){
+        return Object.assign({_id: idx + '-' + Math.random().toString(36).slice(2,8)}, it);
+      });
+      saveItems(); render();
+      alert('Backup restaurado: ' + items.length + ' itens.');
+    }catch(e){
+      alert('Nao foi possivel ler esse backup. Confira se colou o JSON completo.');
+    }
+  });
+
+  /* ---------------- IMPORT: 8080 + 8211 cross-reference ---------------- */
+
+  document.getElementById('btnToggleImport').addEventListener('click', function(){
+    document.getElementById('importPanel').classList.toggle('collapsed');
+  });
+  document.getElementById('btnImportCancel').addEventListener('click', function(){
+    document.getElementById('importPanel').classList.add('collapsed');
+  });
+
+  function readWorkbookRows(file){
+    return file.arrayBuffer().then(function(buf){
+      var wb = XLSX.read(buf, {type:'array', cellDates:true});
+      var sheet = wb.Sheets[wb.SheetNames[0]];
+      return XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:null});
+    });
+  }
+
+  function renderFileList(container, list, onRemove){
+    container.innerHTML = '';
+    list.forEach(function(item, idx){
+      var row = document.createElement('div'); row.className = 'filerow';
+      var name = document.createElement('span'); name.className = 'fname'; name.textContent = item.name;
+      row.appendChild(name);
+      if(item.filialSelect){
+        var sel = document.createElement('select');
+        [['','Filial (auto)'],['1','Filial 1'],['3','Filial 3']].forEach(function(opt){
+          var o = document.createElement('option'); o.value = opt[0]; o.textContent = opt[1];
+          if(item.filial === opt[0]) o.selected = true;
+          sel.appendChild(o);
+        });
+        sel.addEventListener('change', function(){ item.filial = sel.value; });
+        row.appendChild(sel);
+      }
+      var rm = document.createElement('button'); rm.textContent = '\u2715';
+      rm.addEventListener('click', function(){ onRemove(idx); });
+      row.appendChild(rm);
+      container.appendChild(row);
+    });
+  }
+
+  function removeCusto(idx){ custoFiles.splice(idx,1); renderFileList(document.getElementById('listCusto'), custoFiles, removeCusto); }
+  function removeFefo(idx){ fefoFiles.splice(idx,1); renderFileList(document.getElementById('listFefo'), fefoFiles, removeFefo); }
+
+  document.getElementById('fileCusto').addEventListener('change', function(e){
+    Array.prototype.forEach.call(e.target.files, function(f){ custoFiles.push({name:f.name, file:f, filial:'', filialSelect:true}); });
+    e.target.value = '';
+    renderFileList(document.getElementById('listCusto'), custoFiles, removeCusto);
+  });
+  document.getElementById('fileFefo').addEventListener('change', function(e){
+    Array.prototype.forEach.call(e.target.files, function(f){
+      fefoFiles.push({name:f.name, file:f, filial: guessFilialFromName(f.name), filialSelect:true});
+    });
+    e.target.value = '';
+    renderFileList(document.getElementById('listFefo'), fefoFiles, removeFefo);
+  });
+
+  function guessFilialFromName(name){
+    var m = name.match(/f\s*([13])\b/i) || name.match(/filial\s*([13])/i);
+    return m ? m[1] : '';
+  }
+
+  function excelDateToStr(val){
+    if(val === null || val === undefined || val === '') return '';
+    if(val instanceof Date){
+      return pad2(val.getDate()) + '/' + pad2(val.getMonth()+1) + '/' + String(val.getFullYear()).slice(-2);
+    }
+    if(typeof val === 'number'){
+      var ms = Date.UTC(1899, 11, 30) + val * 86400000;
+      var d = new Date(ms);
+      return pad2(d.getUTCDate()) + '/' + pad2(d.getUTCMonth()+1) + '/' + String(d.getUTCFullYear()).slice(-2);
+    }
+    return String(val).trim();
+  }
+  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+
+  function detectFefoColumns(rows){
+    var headerRowIdx = -1, map = {};
+    for(var i=0; i<Math.min(rows.length, 15); i++){
+      var row = rows[i] || [];
+      var joined = row.map(function(c){ return c === null ? '' : String(c); }).join(' | ').toLowerCase();
+      if(joined.indexOf('produto') > -1){
+        headerRowIdx = i;
+        row.forEach(function(cell, ci){
+          var t = (cell === null ? '' : String(cell)).toLowerCase();
+          if(/produto/.test(t)) map.prod = ci;
+          else if(/geral|^wms$|quantidade/.test(t)) { if(map.qtd === undefined) map.qtd = ci; }
+          else if(/^un\.?$|unidade/.test(t)) map.un = ci;
+          else if(/dias/.test(t)) map.dias = ci;
+          else if(/valid/.test(t)) map.valid = ci;
+        });
+        break;
+      }
+    }
+    return {headerRowIdx: headerRowIdx, map: map};
+  }
+
+  /* Rotina 1707 (Consultas Auxiliares - Validade): sem cabecalho, codigo e
+     descricao em colunas separadas. Layout observado: col0=codigo, col1=descricao,
+     col9=data validade, col10=dias a vencer, col13=quantidade. Sem coluna de unidade. */
+  function looksLike1707(rows){
+    for(var i=0; i<Math.min(rows.length, 5); i++){
+      var row = rows[i];
+      if(row && typeof row[0] === 'number' && typeof row[1] === 'string' && row.length >= 14){
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function overrideOrDetect(rows){
+    var manualCod = numOrUndef('colFefoCod');
+    var manualDesc = numOrUndef('colFefoDesc');
+    var manualProd = numOrUndef('colFefoProd');
+    var manualQtd = numOrUndef('colFefoQtd');
+    var manualUn = numOrUndef('colFefoUn');
+    var manualDias = numOrUndef('colFefoDias');
+    var manualValid = numOrUndef('colFefoValid');
+
+    if(manualCod !== undefined || manualDesc !== undefined){
+      return {style:'1707', headerRowIdx:-1, map:{
+        cod: manualCod !== undefined ? manualCod : 0,
+        desc: manualDesc !== undefined ? manualDesc : 1,
+        qtd: manualQtd !== undefined ? manualQtd : 13,
+        dias: manualDias !== undefined ? manualDias : 10,
+        valid: manualValid !== undefined ? manualValid : 9
+      }};
+    }
+    if(manualProd !== undefined){
+      return {style:'8080', headerRowIdx:0, map:{
+        prod: manualProd, qtd: manualQtd, un: manualUn, dias: manualDias, valid: manualValid
+      }};
+    }
+
+    var det = detectFefoColumns(rows);
+    if(det.headerRowIdx >= 0 && det.map.prod !== undefined && det.map.qtd !== undefined){
+      return {style:'8080', headerRowIdx: det.headerRowIdx, map: det.map};
+    }
+    if(looksLike1707(rows)){
+      return {style:'1707', headerRowIdx:-1, map:{cod:0, desc:1, qtd:13, dias:10, valid:9}};
+    }
+    return {style:'unknown', headerRowIdx:-1, map:{}};
+  }
+  function numOrUndef(id){
+    var v = document.getElementById(id).value;
+    return v === '' ? undefined : parseInt(v, 10);
+  }
+
+  document.getElementById('btnProcessar').addEventListener('click', async function(){
+    var msg = document.getElementById('importMsg');
+    msg.textContent = 'Processando...';
+    try{
+      if(custoFiles.length === 0){ msg.textContent = 'Envie ao menos um arquivo 8211 (custo/venda).'; return; }
+      if(fefoFiles.length === 0){ msg.textContent = 'Envie ao menos um arquivo 8080 (validade).'; return; }
+
+      var prodCol = parseInt(document.getElementById('colCustoProd').value, 10);
+      var custoCol = parseInt(document.getElementById('colCustoValor').value, 10);
+      var vendaCol = parseInt(document.getElementById('colVendaValor').value, 10);
+
+      var costIndex = {};
+      for(var i=0; i<custoFiles.length; i++){
+        var cf = custoFiles[i];
+        var rows = await readWorkbookRows(cf.file);
+        var filial = cf.filial || guessFilialFromName(cf.name) || '?';
+        rows.forEach(function(row){
+          if(!row || row[prodCol] === null || row[prodCol] === undefined) return;
+          var prodStr = String(row[prodCol]);
+          if(prodStr.indexOf(' - ') === -1) return;
+          var code = prodStr.split(' - ')[0].trim();
+          var custo = parseNum(row[custoCol]);
+          var venda = parseNum(row[vendaCol]);
+          if(!costIndex[code]) costIndex[code] = [];
+          costIndex[code].push({filial: filial, custo: custo, venda: venda});
+        });
+      }
+
+      previewItems = [];
+      for(var j=0; j<fefoFiles.length; j++){
+        var ff = fefoFiles[j];
+        var fileFilial = ff.filial || guessFilialFromName(ff.name) || '';
+        var frows = await readWorkbookRows(ff.file);
+        var cfg = overrideOrDetect(frows);
+        if(cfg.style === 'unknown'){
+          msg.textContent = 'Nao foi possivel reconhecer o formato do arquivo "' + ff.name + '". Use as opcoes avancadas pra indicar as colunas manualmente (0 = primeira coluna).';
+          return;
+        }
+        var startRow = cfg.headerRowIdx >= 0 ? cfg.headerRowIdx + 1 : 0;
+        for(var r=startRow; r<frows.length; r++){
+          var row = frows[r];
+          if(!row) continue;
+          var prodStr, code, un;
+          if(cfg.style === '1707'){
+            if(row[cfg.map.cod] === null || row[cfg.map.cod] === undefined) continue;
+            code = String(row[cfg.map.cod]).trim().replace(/\.0$/, '');
+            var desc = row[cfg.map.desc] === null ? '' : String(row[cfg.map.desc]).trim();
+            prodStr = code + ' - ' + desc;
+            un = 'KG';
+          } else {
+            if(row[cfg.map.prod] === null || row[cfg.map.prod] === undefined) continue;
+            prodStr = String(row[cfg.map.prod]).trim();
+            if(prodStr.indexOf(' - ') === -1) continue;
+            code = prodStr.split(' - ')[0].trim();
+            un = cfg.map.un !== undefined ? String(row[cfg.map.un] || 'KG').trim().toUpperCase() : 'KG';
+          }
+          var qtd = parseNum(row[cfg.map.qtd]);
+          if(qtd === null) continue;
+          var dias = cfg.map.dias !== undefined ? parseNum(row[cfg.map.dias]) : null;
+          var valid = cfg.map.valid !== undefined ? excelDateToStr(row[cfg.map.valid]) : '';
+
+          var matches = costIndex[code] || [];
+          var status = 'bad', filial = fileFilial, custo = null, venda = null, note = 'Nao encontrado no 8211';
+          if(fileFilial){
+            var exact = matches.filter(function(m){ return m.filial === fileFilial; });
+            if(exact.length){
+              status = 'ok'; custo = exact[0].custo; venda = exact[0].venda; note = 'OK';
+            } else if(matches.length){
+              status = 'warn'; custo = matches[0].custo; venda = matches[0].venda;
+              note = 'Sem custo na filial ' + fileFilial + ' - usando o da filial ' + matches[0].filial;
+            }
+          } else if(matches.length === 1){
+            status = 'ok'; filial = matches[0].filial; custo = matches[0].custo; venda = matches[0].venda; note = 'OK';
+          } else if(matches.length > 1){
+            status = 'warn'; filial = matches[0].filial; custo = matches[0].custo; venda = matches[0].venda;
+            note = 'Codigo em ' + matches.length + ' filiais - confira';
+          }
+          previewItems.push({p: prodStr, f: filial, u: un, q: qtd, d: dias, v: valid, c: custo, s: venda, status: status, note: note});
+        }
+      }
+
+      renderPreview();
+      document.getElementById('importPanel').classList.add('collapsed');
+      document.getElementById('previewPanel').classList.remove('collapsed');
+      msg.textContent = '';
+    }catch(err){
+      msg.textContent = 'Erro ao processar: ' + (err && err.message ? err.message : err);
+    }
+  });
+
+  function renderPreview(){
+    var body = document.getElementById('previewBody');
+    body.innerHTML = '';
+    var ok = 0, warn = 0, bad = 0;
+    previewItems.forEach(function(it){
+      if(it.status === 'ok') ok++; else if(it.status === 'warn') warn++; else bad++;
+      var tr = document.createElement('tr');
+      function td(text){ var d = document.createElement('td'); d.textContent = text; return d; }
+      tr.appendChild(td(it.p));
+      tr.appendChild(td(it.f ? 'Filial ' + it.f : '-'));
+      tr.appendChild(td(it.u));
+      tr.appendChild(td(it.q));
+      tr.appendChild(td(it.d === null ? '-' : it.d));
+      tr.appendChild(td(it.v || '-'));
+      tr.appendChild(td(it.c === null ? '-' : it.c));
+      tr.appendChild(td(it.s === null ? '-' : it.s));
+      var tdStatus = document.createElement('td');
+      var badge = document.createElement('span');
+      if(it.status === 'ok'){ badge.className = 'badge ok'; badge.textContent = 'OK'; }
+      else if(it.status === 'warn'){ badge.className = 'badge warn'; badge.textContent = it.note; }
+      else { badge.className = 'badge bad'; badge.textContent = it.note; }
+      tdStatus.appendChild(badge);
+      tr.appendChild(tdStatus);
+      body.appendChild(tr);
+    });
+    document.getElementById('previewSummary').textContent =
+      previewItems.length + ' item(ns) lido(s) - ' + ok + ' cruzados com sucesso, ' + warn + ' com pendencia, ' + bad + ' sem custo encontrado no 8211.';
+  }
+
+  document.getElementById('btnPreviewCancel').addEventListener('click', function(){
+    document.getElementById('previewPanel').classList.add('collapsed');
+    previewItems = [];
+  });
+  document.getElementById('btnPreviewAppend').addEventListener('click', function(){
+    commitPreview(false);
+  });
+  document.getElementById('btnPreviewReplace').addEventListener('click', function(){
+    if(confirm('Isso vai substituir todos os itens atuais pelos itens importados. Continuar?')){
+      commitPreview(true);
+    }
+  });
+  function commitPreview(replace){
+    var toAdd = previewItems.map(function(it){
+      return {_id:'n-'+Math.random().toString(36).slice(2,8), p:it.p, f:it.f||'1', u:it.u, q:it.q, d:it.d, v:it.v, c:it.c||0, s:it.s};
+    });
+    items = replace ? toAdd : items.concat(toAdd);
+    previewItems = [];
+    saveItems(); render();
+    document.getElementById('previewPanel').classList.add('collapsed');
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>

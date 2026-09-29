@@ -914,6 +914,19 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     return false;
   }
 
+  /* Rotina 8080 exportada sem linha de cabecalho: col0=rua, col1=produto
+     (codigo - descricao), col2=qtd estoque geral, col3=bloqueado, col4=un,
+     col5=qtd caixa, col6=dias a vencer, col7=validade. */
+  function looksLike8080NoHeader(rows){
+    for(var i=0; i<Math.min(rows.length, 5); i++){
+      var row = rows[i];
+      if(row && typeof row[1] === 'string' && row[1].indexOf(' - ') > -1 && row.length >= 7 && row.length < 14){
+        return true;
+      }
+    }
+    return false;
+  }
+
   function overrideOrDetect(rows){
     var manualCod = numOrUndef('colFefoCod');
     var manualDesc = numOrUndef('colFefoDesc');
@@ -941,6 +954,9 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     var det = detectFefoColumns(rows);
     if(det.headerRowIdx >= 0 && det.map.prod !== undefined && det.map.qtd !== undefined){
       return {style:'8080', headerRowIdx: det.headerRowIdx, map: det.map};
+    }
+    if(looksLike8080NoHeader(rows)){
+      return {style:'8080', headerRowIdx:-1, map:{prod:1, qtd:2, un:4, dias:6, valid:7}};
     }
     if(looksLike1707(rows)){
       return {style:'1707', headerRowIdx:-1, map:{cod:0, desc:1, qtd:13, dias:10, valid:9}};

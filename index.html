@@ -496,7 +496,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     var wrap = document.getElementById('filialSummary');
     if(keys.length <= 1){ wrap.innerHTML = ''; return; }
     var html = '<table class="filial-summary"><thead><tr>' +
-      '<th>Filial</th><th class="num">Itens</th><th class="num">Custo total</th><th class="num">Venda total</th><th class="num">Markup medio</th>' +
+      '<th>Filial</th><th class="num">Itens</th><th class="num">Custo total</th><th class="num">Venda total</th><th class="num">Markup medio</th><th class="num">Margem media</th>' +
       '</tr></thead><tbody>';
     var grandItens = 0, grandCusto = 0, grandVenda = 0, grandHasVenda = false;
     keys.forEach(function(k){
@@ -504,14 +504,16 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       grandItens += g.itens; grandCusto += g.custo;
       if(g.hasVenda){ grandVenda += g.venda; grandHasVenda = true; }
       var markup = (g.hasVenda && g.custo) ? ((g.venda - g.custo)/g.custo*100).toFixed(1) + '%' : '-';
+      var margem = (g.hasVenda && g.venda) ? ((g.venda - g.custo)/g.venda*100).toFixed(1) + '%' : '-';
       html += '<tr><td>Filial ' + k + '</td><td class="num">' + g.itens + '</td><td class="num">' +
         fmtMoney(g.custo) + '</td><td class="num">' + (g.hasVenda ? fmtMoney(g.venda) : '-') +
-        '</td><td class="num">' + markup + '</td></tr>';
+        '</td><td class="num">' + markup + '</td><td class="num">' + margem + '</td></tr>';
     });
     var markupTotal = (grandHasVenda && grandCusto) ? ((grandVenda - grandCusto)/grandCusto*100).toFixed(1) + '%' : '-';
+    var margemTotal = (grandHasVenda && grandVenda) ? ((grandVenda - grandCusto)/grandVenda*100).toFixed(1) + '%' : '-';
     html += '<tr class="grand"><td>Total geral</td><td class="num">' + grandItens + '</td><td class="num">' +
       fmtMoney(grandCusto) + '</td><td class="num">' + (grandHasVenda ? fmtMoney(grandVenda) : '-') +
-      '</td><td class="num">' + markupTotal + '</td></tr>';
+      '</td><td class="num">' + markupTotal + '</td><td class="num">' + margemTotal + '</td></tr>';
     html += '</tbody></table>';
     wrap.innerHTML = html;
   }

@@ -148,6 +148,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     <div>
       <h1>Controle FEFO</h1>
       <p class="subtitle">Custo (+ICMS), preco de venda e margem por item. Ordenado por dias a vencer.</p>
+      <p class="hint" id="syncBanner" style="margin:2px 0 0"></p>
     </div>
     <div class="theme-toggle" id="themeToggle">
       <button type="button" data-theme-opt="light">Claro</button>
@@ -308,9 +309,11 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   </div>
 
   <p class="foot-note">
-    Os dados ficam salvos neste navegador (armazenamento local do artefato). Use "Backup (JSON)" de vez em
-    quando pra guardar uma copia - isso permite restaurar os dados em outro computador ou navegador.
-    O cruzamento automatico le os arquivos .xls/.xlsx direto no seu navegador; nada e enviado pra fora.
+    Quando aberto pelo link do artefato, os dados ficam sincronizados na nuvem do artefato: quem abrir o
+    mesmo link ve os itens atualizados, incluindo a ultima importacao. Se aberto fora do artefato (arquivo
+    local, por exemplo), os dados ficam salvos so neste navegador - use "Backup (JSON)" pra guardar uma copia
+    e "Restaurar backup" pra trazer de volta em outro navegador. O cruzamento automatico le os arquivos
+    .xls/.xlsx direto no seu navegador; nada e enviado pra fora.
   </p>
 </div>
 
@@ -409,15 +412,121 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   }
 
   var items = loadItems();
-  items.forEach(function(it, idx){ it._id = idx + '-' + Math.random().toString(36).slice(2,8); if(!it.st) it.st = 'normal'; });
+  items.forEach(function(it){ if(!it._id) it._id = 'i-' + Math.random().toString(36).slice(2,10); if(!it.st) it.st = 'normal'; });
 
   function saveItems(){
     try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(items.map(stripId))); }catch(e){}
+    if(dbReady) syncToDb();
   }
   function stripId(it){
+    return {_id:it._id, p:it.p,f:it.f,u:it.u,q:it.q,d:it.d,v:it.v,c:it.c,s:it.s,st:it.st};
+  }
+  function dbBody(it){
     return {p:it.p,f:it.f,u:it.u,q:it.q,d:it.d,v:it.v,c:it.c,s:it.s,st:it.st};
   }
   function isAvaria(it){ return it.st === 'avaria'; }
+
+  /* ---------------- Sincronizacao na nuvem (db do artefato) ----------------
+     Quando aberto pelo link do artefato (com a capability "db" concedida),
+     os itens ficam guardados na colecao compartilhada "items" e o horario
+     da ultima importacao no documento "meta/info". Quem abrir o mesmo link
+     ve a atualizacao em tempo real. Fora do artefato (arquivo local, etc.)
+     window.claude nao existe e o app segue funcionando so com localStorage,
+     como antes. */
+  var db = null;
+  var dbReady = false;
+  var dbSynced = {};
+
+  function syncToDb(){
+    if(!db) return;
+    var col = db.collection('items');
+    var seen = {};
+    items.forEach(function(it){
+      seen[it._id] = true;
+      var json = JSON.stringify(dbBody(it));
+      if(dbSynced[it._id] !== json){
+        dbSynced[it._id] = json;
+        col.doc(it._id).set(dbBody(it)).catch(function(e){ console.error('Erro ao salvar item na nuvem', it._id, e); });
+      }
+    });
+    Object.keys(dbSynced).forEach(function(id){
+      if(!seen[id]){
+        delete dbSynced[id];
+        col.doc(id).delete().catch(function(e){ console.error('Erro ao remover item da nuvem', id, e); });
+      }
+    });
+  }
+
+  function pushAllToDb(){
+    if(!db) return;
+    var col = db.collection('items');
+    dbSynced = {};
+    var writes = items.map(function(it){
+      var body = dbBody(it);
+      dbSynced[it._id] = JSON.stringify(body);
+      return col.doc(it._id).set(body).catch(function(e){ console.error('Erro ao semear item na nuvem', it._id, e); });
+    });
+    return Promise.all(writes).catch(function(){});
+  }
+
+  function touchImportMeta(count, mode){
+    if(!dbReady) return;
+    db.doc('meta/info').set({
+      lastImportAt: new Date().toISOString(),
+      lastImportCount: count,
+      lastImportMode: mode
+    }).catch(function(e){ console.error('Erro ao registrar horario da importacao', e); });
+  }
+
+  function renderSyncBanner(data){
+    var el = document.getElementById('syncBanner');
+    if(!el) return;
+    if(!dbReady){ el.textContent = ''; return; }
+    if(!data || !data.lastImportAt){
+      el.textContent = 'Sincronizado com este link - nenhuma importacao registrada ainda.';
+      return;
+    }
+    var d = new Date(data.lastImportAt);
+    var txt = 'Ultima importacao: ' + pad2(d.getDate()) + '/' + pad2(d.getMonth()+1) + '/' + d.getFullYear() +
+      ' as ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+    if(data.lastImportCount !== undefined && data.lastImportCount !== null){
+      txt += ' - ' + data.lastImportCount + ' item(ns)' + (data.lastImportMode === 'replace' ? ' (substituiu tudo)' : ' (adicionados)');
+    }
+    el.textContent = txt;
+  }
+
+  async function initCloudSync(){
+    if(!(window.claude && typeof window.claude.use === 'function')) return;
+    try{ db = await window.claude.use('db'); }catch(e){ db = null; }
+    if(!db) return;
+    dbReady = true;
+
+    var firstSnapshot = true;
+    db.collection('items').onSnapshot(function(snap){
+      if(firstSnapshot){
+        firstSnapshot = false;
+        if(snap.empty && items.length > 0){
+          pushAllToDb();
+          return;
+        }
+      }
+      var newItems = snap.docs.map(function(d){
+        var it = Object.assign({}, d.data());
+        it._id = d.id;
+        if(!it.st) it.st = 'normal';
+        return it;
+      });
+      items = newItems;
+      dbSynced = {};
+      items.forEach(function(it){ dbSynced[it._id] = JSON.stringify(dbBody(it)); });
+      try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(items.map(stripId))); }catch(e){}
+      render();
+    }, function(err){ console.error('Erro na sincronizacao (itens):', err); });
+
+    db.doc('meta/info').onSnapshot(function(snap){
+      renderSyncBanner(snap.exists ? snap.data() : null);
+    }, function(err){ console.error('Erro na sincronizacao (importacao):', err); });
+  }
 
   function parseNum(s){
     if(typeof s === 'number') return s;
@@ -1083,10 +1192,12 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     items = replace ? toAdd : items.concat(toAdd);
     previewItems = [];
     saveItems(); render();
+    touchImportMeta(toAdd.length, replace ? 'replace' : 'append');
     document.getElementById('previewPanel').classList.add('collapsed');
   }
 
   render();
+  initCloudSync();
 })();
 </script>
 </body>

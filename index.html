@@ -29,6 +29,13 @@
   --yellow:#f5e08a; --yellow-bg:#4a3d00; --blue:#85b7eb; --blue-bg:#042c53; --green:#97c459; --green-bg:#173404;
   --gray-bg:#2c2c2a; --ok:#97c459; --ok-bg:#173404; --warn:#fac775; --warn-bg:#412402;
 }
+:root[data-theme="boibom"]{
+  --bg:#0a2340; --surface:#0f3157; --surface-2:#154070; --text:#eef4fc; --text-secondary:#b7cbe6;
+  --text-muted:#88a5cb; --border:#1e4f80; --border-strong:#2f6499; --accent:#5aa8f2; --accent-text:#eaf3ff;
+  --accent-bg:#154070; --danger:#ff9d9d; --danger-bg:#4a1414; --amber:#ffcf8a; --amber-bg:#4a3005;
+  --yellow:#f5e08a; --yellow-bg:#4a3d00; --blue:#8fc4ff; --blue-bg:#123a63; --green:#a3e07a; --green-bg:#123a1a;
+  --gray-bg:#123a63; --ok:#a3e07a; --ok-bg:#123a1a; --warn:#ffcf8a; --warn-bg:#4a3005;
+}
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;}
 body{padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0) 0;}
@@ -130,12 +137,23 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
 .filial-summary td{padding:7px 12px;border-top:1px solid var(--border);}
 .filial-summary td.num, .filial-summary th.num{text-align:right;}
 .filial-summary tr.grand td{font-weight:600;background:var(--surface-2);}
+.theme-toggle{display:flex;gap:6px;}
+.theme-toggle button{padding:6px 12px;font-size:12.5px;}
+.theme-toggle button.active{background:var(--accent);border-color:var(--accent);color:#fff;}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Controle FEFO</h1>
-  <p class="subtitle">Custo (+ICMS), preco de venda e margem por item. Ordenado por dias a vencer.</p>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+    <div>
+      <h1>Controle FEFO</h1>
+      <p class="subtitle">Custo (+ICMS), preco de venda e margem por item. Ordenado por dias a vencer.</p>
+    </div>
+    <div class="theme-toggle" id="themeToggle">
+      <button type="button" data-theme-opt="light">Claro</button>
+      <button type="button" data-theme-opt="boibom">Azul Boibom</button>
+    </div>
+  </div>
 
   <div class="cards" id="cards"></div>
   <div id="filialSummary"></div>
@@ -300,6 +318,27 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
 <script>
 (function(){
   var STORAGE_KEY = 'fefo_tracker_v1';
+  var THEME_KEY = 'fefo_theme_v1';
+
+  function applyTheme(theme){
+    if(theme === 'boibom') document.documentElement.setAttribute('data-theme', 'boibom');
+    else document.documentElement.setAttribute('data-theme', 'light');
+    var buttons = document.querySelectorAll('#themeToggle button');
+    for(var i=0; i<buttons.length; i++){
+      buttons[i].classList.toggle('active', buttons[i].getAttribute('data-theme-opt') === theme);
+    }
+    try{ localStorage.setItem(THEME_KEY, theme); }catch(e){}
+  }
+  (function initTheme(){
+    var saved = 'light';
+    try{ saved = localStorage.getItem(THEME_KEY) || 'light'; }catch(e){}
+    applyTheme(saved);
+    var buttons = document.querySelectorAll('#themeToggle button');
+    for(var i=0; i<buttons.length; i++){
+      buttons[i].addEventListener('click', function(){ applyTheme(this.getAttribute('data-theme-opt')); });
+    }
+  })();
+
   var sortAsc = true;
   var custoFiles = [];
   var fefoFiles = [];

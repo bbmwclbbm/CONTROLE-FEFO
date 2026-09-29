@@ -523,37 +523,66 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   var db = null;
   var dbReady = false;
   var dbSynced = {};
+  var suppressSnapshotRender = false;
+  var renderDebounceTimer = null;
 
-  function syncToDb(){
+  /* Escreve em lotes pequenos (em vez de disparar centenas de gravacoes
+     simultaneas) pra nao sobrecarregar a conexao/limite de taxa do banco
+     compartilhado - o que deixava uma importacao grande lenta e com a
+     tabela "entrando aos poucos". */
+  function writeInChunks(list, fn, chunkSize){
+    chunkSize = chunkSize || 15;
+    var i = 0;
+    function next(){
+      if(i >= list.length) return Promise.resolve();
+      var chunk = list.slice(i, i + chunkSize);
+      i += chunkSize;
+      return Promise.all(chunk.map(fn)).then(next);
+    }
+    return next();
+  }
+
+  async function syncToDb(){
     if(!db) return;
     var col = db.collection('items');
     var seen = {};
+    var toSet = [];
     items.forEach(function(it){
       seen[it._id] = true;
       var json = JSON.stringify(dbBody(it));
-      if(dbSynced[it._id] !== json){
-        dbSynced[it._id] = json;
-        col.doc(it._id).set(dbBody(it)).catch(function(e){ console.error('Erro ao salvar item na nuvem', it._id, e); });
-      }
+      if(dbSynced[it._id] !== json) toSet.push(it);
     });
-    Object.keys(dbSynced).forEach(function(id){
-      if(!seen[id]){
+    var toDelete = Object.keys(dbSynced).filter(function(id){ return !seen[id]; });
+
+    suppressSnapshotRender = true;
+    try{
+      await writeInChunks(toSet, function(it){
+        dbSynced[it._id] = JSON.stringify(dbBody(it));
+        return col.doc(it._id).set(dbBody(it)).catch(function(e){ console.error('Erro ao salvar item na nuvem', it._id, e); });
+      });
+      await writeInChunks(toDelete, function(id){
         delete dbSynced[id];
-        col.doc(id).delete().catch(function(e){ console.error('Erro ao remover item da nuvem', id, e); });
-      }
-    });
+        return col.doc(id).delete().catch(function(e){ console.error('Erro ao remover item da nuvem', id, e); });
+      });
+    } finally {
+      suppressSnapshotRender = false;
+    }
   }
 
-  function pushAllToDb(){
+  async function pushAllToDb(){
     if(!db) return;
     var col = db.collection('items');
     dbSynced = {};
-    var writes = items.map(function(it){
-      var body = dbBody(it);
-      dbSynced[it._id] = JSON.stringify(body);
-      return col.doc(it._id).set(body).catch(function(e){ console.error('Erro ao semear item na nuvem', it._id, e); });
-    });
-    return Promise.all(writes).catch(function(){});
+    suppressSnapshotRender = true;
+    try{
+      await writeInChunks(items, function(it){
+        var body = dbBody(it);
+        dbSynced[it._id] = JSON.stringify(body);
+        return col.doc(it._id).set(body).catch(function(e){ console.error('Erro ao semear item na nuvem', it._id, e); });
+      });
+    } finally {
+      suppressSnapshotRender = false;
+    }
   }
 
   function touchImportMeta(count, mode){
@@ -597,6 +626,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
           return;
         }
       }
+      if(suppressSnapshotRender) return;
       var newItems = snap.docs.map(function(d){
         var it = Object.assign({}, d.data());
         it._id = d.id;
@@ -607,7 +637,11 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       dbSynced = {};
       items.forEach(function(it){ dbSynced[it._id] = JSON.stringify(dbBody(it)); });
       try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(items.map(stripId))); }catch(e){}
-      render();
+      /* Uma importacao grande chega como muitas atualizacoes de documentos
+         em sequencia rapida - sem isso, cada uma delas redesenharia a
+         tabela inteira de novo, dando a impressao de "entrando aos poucos". */
+      if(renderDebounceTimer) clearTimeout(renderDebounceTimer);
+      renderDebounceTimer = setTimeout(function(){ renderDebounceTimer = null; render(); }, 250);
     }, function(err){ console.error('Erro na sincronizacao (itens):', err); });
 
     db.doc('meta/info').onSnapshot(function(snap){

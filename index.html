@@ -149,6 +149,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       <h1>Controle FEFO</h1>
       <p class="subtitle">Custo (+ICMS), preco de venda e margem por item. Ordenado por dias a vencer.</p>
       <p class="hint" id="syncBanner" style="margin:2px 0 0"></p>
+      <p class="hint" id="autoLoadBanner" style="margin:2px 0 0"></p>
     </div>
     <div class="theme-toggle" id="themeToggle">
       <button type="button" data-theme-opt="light">Claro</button>
@@ -161,6 +162,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
 
   <div class="toolbar">
     <button class="primary" id="btnToggleImport">Importar arquivos (1707 + 8211)</button>
+    <button id="btnAutoReload">Atualizar do repositorio</button>
     <button id="btnAdd">+ Novo item</button>
     <button id="btnPaste">Colar dados</button>
     <button id="btnExportCsv">Exportar CSV</button>
@@ -1057,6 +1059,77 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     return v === '' ? undefined : parseInt(v, 10);
   }
 
+  /* Cruza os arquivos 8211 (custo/venda) com os arquivos 1707 (validade) ja
+     lidos (arrays de linhas), retornando os itens resultantes. Usado tanto
+     pelo botao manual de importacao quanto pela leitura automatica dos
+     arquivos do repositorio. costFiles/fefoFiles: [{rows, filial, name}]. */
+  function crossReference(costFiles, fefoFiles, cols){
+    var prodCol = cols.prodCol, custoCol = cols.custoCol, vendaCol = cols.vendaCol;
+    var costIndex = {};
+    costFiles.forEach(function(cf){
+      var filial = cf.filial || guessFilialFromName(cf.name) || '?';
+      cf.rows.forEach(function(row){
+        if(!row || row[prodCol] === null || row[prodCol] === undefined) return;
+        var prodStr = String(row[prodCol]);
+        if(prodStr.indexOf(' - ') === -1) return;
+        var code = prodStr.split(' - ')[0].trim();
+        var custo = parseNum(row[custoCol]);
+        var venda = parseNum(row[vendaCol]);
+        if(!costIndex[code]) costIndex[code] = [];
+        costIndex[code].push({filial: filial, custo: custo, venda: venda});
+      });
+    });
+
+    var result = [];
+    for(var j=0; j<fefoFiles.length; j++){
+      var ff = fefoFiles[j];
+      var fileFilial = ff.filial || guessFilialFromName(ff.name) || '';
+      var frows = ff.rows;
+      var cfg = overrideOrDetect(frows);
+      if(cfg.style === 'unknown'){
+        return {error: 'Nao foi possivel reconhecer o formato do arquivo "' + ff.name + '". Use as opcoes avancadas pra indicar as colunas manualmente (0 = primeira coluna).'};
+      }
+      var startRow = cfg.headerRowIdx >= 0 ? cfg.headerRowIdx + 1 : 0;
+      for(var r=startRow; r<frows.length; r++){
+        var row = frows[r];
+        if(!row) continue;
+        if(row[cfg.map.cod] === null || row[cfg.map.cod] === undefined) continue;
+        var code = String(row[cfg.map.cod]).trim().replace(/\.0$/, '');
+        if(code === '') continue;
+        var desc = row[cfg.map.desc] === null ? '' : String(row[cfg.map.desc]).trim();
+        var prodStr = code + ' - ' + desc;
+        var un = 'KG';
+
+        var qtd = parseNum(row[cfg.map.qtd]);
+        if(qtd === null) continue;
+        var dias = cfg.map.dias !== undefined ? parseNum(row[cfg.map.dias]) : null;
+        var valid = cfg.map.valid !== undefined ? excelDateToStr(row[cfg.map.valid]) : '';
+        var statusRaw = (cfg.map.status !== undefined && row[cfg.map.status] !== null && row[cfg.map.status] !== undefined)
+          ? String(row[cfg.map.status]).trim().toUpperCase() : '';
+        var itemStatus = statusRaw.indexOf('AVARIA') > -1 ? 'avaria' : 'normal';
+
+        var matches = costIndex[code] || [];
+        var status = 'bad', filial = fileFilial, custo = null, venda = null, note = 'Nao encontrado no 8211';
+        if(fileFilial){
+          var exact = matches.filter(function(m){ return m.filial === fileFilial; });
+          if(exact.length){
+            status = 'ok'; custo = exact[0].custo; venda = exact[0].venda; note = 'OK';
+          } else if(matches.length){
+            status = 'warn'; custo = matches[0].custo; venda = matches[0].venda;
+            note = 'Sem custo na filial ' + fileFilial + ' - usando o da filial ' + matches[0].filial;
+          }
+        } else if(matches.length === 1){
+          status = 'ok'; filial = matches[0].filial; custo = matches[0].custo; venda = matches[0].venda; note = 'OK';
+        } else if(matches.length > 1){
+          status = 'warn'; filial = matches[0].filial; custo = matches[0].custo; venda = matches[0].venda;
+          note = 'Codigo em ' + matches.length + ' filiais - confira';
+        }
+        result.push({p: prodStr, f: filial, u: un, q: qtd, d: dias, v: valid, c: custo, s: venda, st: itemStatus, status: status, note: note});
+      }
+    }
+    return {items: result};
+  }
+
   document.getElementById('btnProcessar').addEventListener('click', async function(){
     var msg = document.getElementById('importMsg');
     msg.textContent = 'Processando...';
@@ -1064,75 +1137,26 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       if(custoFiles.length === 0){ msg.textContent = 'Envie ao menos um arquivo 8211 (custo/venda).'; return; }
       if(fefoFiles.length === 0){ msg.textContent = 'Envie ao menos um arquivo 1707 (validade).'; return; }
 
-      var prodCol = parseInt(document.getElementById('colCustoProd').value, 10);
-      var custoCol = parseInt(document.getElementById('colCustoValor').value, 10);
-      var vendaCol = parseInt(document.getElementById('colVendaValor').value, 10);
+      var cols = {
+        prodCol: parseInt(document.getElementById('colCustoProd').value, 10),
+        custoCol: parseInt(document.getElementById('colCustoValor').value, 10),
+        vendaCol: parseInt(document.getElementById('colVendaValor').value, 10)
+      };
 
-      var costIndex = {};
+      var costFilesRead = [];
       for(var i=0; i<custoFiles.length; i++){
         var cf = custoFiles[i];
-        var rows = await readWorkbookRows(cf.file);
-        var filial = cf.filial || guessFilialFromName(cf.name) || '?';
-        rows.forEach(function(row){
-          if(!row || row[prodCol] === null || row[prodCol] === undefined) return;
-          var prodStr = String(row[prodCol]);
-          if(prodStr.indexOf(' - ') === -1) return;
-          var code = prodStr.split(' - ')[0].trim();
-          var custo = parseNum(row[custoCol]);
-          var venda = parseNum(row[vendaCol]);
-          if(!costIndex[code]) costIndex[code] = [];
-          costIndex[code].push({filial: filial, custo: custo, venda: venda});
-        });
+        costFilesRead.push({rows: await readWorkbookRows(cf.file), filial: cf.filial, name: cf.name});
       }
-
-      previewItems = [];
+      var fefoFilesRead = [];
       for(var j=0; j<fefoFiles.length; j++){
         var ff = fefoFiles[j];
-        var fileFilial = ff.filial || guessFilialFromName(ff.name) || '';
-        var frows = await readWorkbookRows(ff.file);
-        var cfg = overrideOrDetect(frows);
-        if(cfg.style === 'unknown'){
-          msg.textContent = 'Nao foi possivel reconhecer o formato do arquivo "' + ff.name + '". Use as opcoes avancadas pra indicar as colunas manualmente (0 = primeira coluna).';
-          return;
-        }
-        var startRow = cfg.headerRowIdx >= 0 ? cfg.headerRowIdx + 1 : 0;
-        for(var r=startRow; r<frows.length; r++){
-          var row = frows[r];
-          if(!row) continue;
-          if(row[cfg.map.cod] === null || row[cfg.map.cod] === undefined) continue;
-          var code = String(row[cfg.map.cod]).trim().replace(/\.0$/, '');
-          if(code === '') continue;
-          var desc = row[cfg.map.desc] === null ? '' : String(row[cfg.map.desc]).trim();
-          var prodStr = code + ' - ' + desc;
-          var un = 'KG';
-
-          var qtd = parseNum(row[cfg.map.qtd]);
-          if(qtd === null) continue;
-          var dias = cfg.map.dias !== undefined ? parseNum(row[cfg.map.dias]) : null;
-          var valid = cfg.map.valid !== undefined ? excelDateToStr(row[cfg.map.valid]) : '';
-          var statusRaw = (cfg.map.status !== undefined && row[cfg.map.status] !== null && row[cfg.map.status] !== undefined)
-            ? String(row[cfg.map.status]).trim().toUpperCase() : '';
-          var itemStatus = statusRaw.indexOf('AVARIA') > -1 ? 'avaria' : 'normal';
-
-          var matches = costIndex[code] || [];
-          var status = 'bad', filial = fileFilial, custo = null, venda = null, note = 'Nao encontrado no 8211';
-          if(fileFilial){
-            var exact = matches.filter(function(m){ return m.filial === fileFilial; });
-            if(exact.length){
-              status = 'ok'; custo = exact[0].custo; venda = exact[0].venda; note = 'OK';
-            } else if(matches.length){
-              status = 'warn'; custo = matches[0].custo; venda = matches[0].venda;
-              note = 'Sem custo na filial ' + fileFilial + ' - usando o da filial ' + matches[0].filial;
-            }
-          } else if(matches.length === 1){
-            status = 'ok'; filial = matches[0].filial; custo = matches[0].custo; venda = matches[0].venda; note = 'OK';
-          } else if(matches.length > 1){
-            status = 'warn'; filial = matches[0].filial; custo = matches[0].custo; venda = matches[0].venda;
-            note = 'Codigo em ' + matches.length + ' filiais - confira';
-          }
-          previewItems.push({p: prodStr, f: filial, u: un, q: qtd, d: dias, v: valid, c: custo, s: venda, st: itemStatus, status: status, note: note});
-        }
+        fefoFilesRead.push({rows: await readWorkbookRows(ff.file), filial: ff.filial, name: ff.name});
       }
+
+      var res = crossReference(costFilesRead, fefoFilesRead, cols);
+      if(res.error){ msg.textContent = res.error; return; }
+      previewItems = res.items;
 
       renderPreview();
       document.getElementById('importPanel').classList.add('collapsed');
@@ -1142,6 +1166,82 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       msg.textContent = 'Erro ao processar: ' + (err && err.message ? err.message : err);
     }
   });
+
+  /* ---------------- Leitura automatica dos arquivos do repositorio ----------------
+     Ao abrir a pagina, tenta buscar os arquivos 1707/8211 publicados junto do
+     proprio index.html (mesma pasta) e cruza automaticamente, sem precisar de
+     nenhum clique. Se os arquivos nao existirem nesse local (ex: aberto fora
+     do repositorio, ou nomes diferentes), falha silenciosamente e o app segue
+     com os dados salvos localmente/nuvem, como antes. */
+  var AUTO_IMPORT_FILES = {
+    fefo: [
+      {file: '1707 f1.xls', filial: '1'},
+      {file: '1707 f3.xls', filial: '3'}
+    ],
+    custo: [
+      {file: '8211 f1.xls', filial: '1'},
+      {file: '8211 f3.xls', filial: '3'}
+    ]
+  };
+
+  function readWorkbookRowsFromUrl(url){
+    return fetch(url).then(function(r){
+      if(!r.ok) throw new Error('HTTP ' + r.status + ' ao buscar ' + url);
+      return r.arrayBuffer();
+    }).then(function(buf){
+      var wb = XLSX.read(buf, {type:'array', cellDates:true});
+      var sheet = wb.Sheets[wb.SheetNames[0]];
+      return XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:null});
+    });
+  }
+
+  async function tryAutoImport(){
+    try{
+      var custoResults = await Promise.allSettled(AUTO_IMPORT_FILES.custo.map(function(f){
+        return readWorkbookRowsFromUrl(encodeURIComponent(f.file)).then(function(rows){ return {rows: rows, filial: f.filial, name: f.file}; });
+      }));
+      var fefoResults = await Promise.allSettled(AUTO_IMPORT_FILES.fefo.map(function(f){
+        return readWorkbookRowsFromUrl(encodeURIComponent(f.file)).then(function(rows){ return {rows: rows, filial: f.filial, name: f.file}; });
+      }));
+      var costFilesRead = custoResults.filter(function(r){ return r.status === 'fulfilled'; }).map(function(r){ return r.value; });
+      var fefoFilesRead = fefoResults.filter(function(r){ return r.status === 'fulfilled'; }).map(function(r){ return r.value; });
+
+      if(costFilesRead.length === 0 || fefoFilesRead.length === 0){
+        setAutoLoadBanner('Nenhum arquivo 1707/8211 encontrado no repositorio nesse local - os dados atuais foram mantidos.');
+        return;
+      }
+
+      var cols = {prodCol: 0, custoCol: 12, vendaCol: 14};
+      var res = crossReference(costFilesRead, fefoFilesRead, cols);
+      if(res.error || !res.items || res.items.length === 0){
+        setAutoLoadBanner(res.error || 'Os arquivos do repositorio nao produziram nenhum item - os dados atuais foram mantidos.');
+        return;
+      }
+
+      items = res.items.map(function(it){
+        return {_id:'auto-'+Math.random().toString(36).slice(2,10), p:it.p, f:it.f||'1', st:it.st||'normal', u:it.u, q:it.q, d:it.d, v:it.v, c:it.c||0, s:it.s};
+      });
+      saveItems(); render();
+      touchImportMeta(items.length, 'replace');
+      renderAutoLoadBanner(costFilesRead.length, fefoFilesRead.length);
+    }catch(e){
+      console.error('Leitura automatica dos arquivos do repositorio falhou:', e);
+      setAutoLoadBanner('Nao foi possivel buscar os arquivos do repositorio agora.');
+    }
+  }
+
+  function setAutoLoadBanner(text){
+    var el = document.getElementById('autoLoadBanner');
+    if(el) el.textContent = text;
+  }
+
+  function renderAutoLoadBanner(nCusto, nFefo){
+    var el = document.getElementById('autoLoadBanner');
+    if(!el) return;
+    var now = new Date();
+    el.textContent = 'Dados carregados automaticamente do repositorio em ' + pad2(now.getDate()) + '/' + pad2(now.getMonth()+1) + '/' + now.getFullYear() +
+      ' as ' + pad2(now.getHours()) + ':' + pad2(now.getMinutes()) + ' (' + nFefo + ' arquivo(s) 1707, ' + nCusto + ' arquivo(s) 8211).';
+  }
 
   function renderPreview(){
     var body = document.getElementById('previewBody');
@@ -1196,8 +1296,15 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     document.getElementById('previewPanel').classList.add('collapsed');
   }
 
+  document.getElementById('btnAutoReload').addEventListener('click', function(){
+    var el = document.getElementById('autoLoadBanner');
+    if(el) el.textContent = 'Buscando arquivos atualizados no repositorio...';
+    tryAutoImport();
+  });
+
   render();
   initCloudSync();
+  tryAutoImport();
 })();
 </script>
 </body>

@@ -238,7 +238,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
         <thead>
           <tr>
             <th>Produto</th><th>Filial</th><th>Un.</th><th>Qtd</th><th>Dias</th><th>Validade</th>
-            <th>Custo +ICMS</th><th>Preco venda</th><th>Status</th>
+            <th>Custo +ICMS</th><th>Preco venda</th><th>Tipo</th><th>Status</th>
           </tr>
         </thead>
         <tbody id="previewBody"></tbody>
@@ -272,6 +272,11 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       <option value="1">Filial 1</option>
       <option value="3">Filial 3</option>
     </select>
+    <select id="filStatus">
+      <option value="">Normal + Avaria</option>
+      <option value="normal">Somente normal</option>
+      <option value="avaria">Somente avaria</option>
+    </select>
     <input type="text" id="filBusca" placeholder="Buscar produto...">
   </div>
 
@@ -279,8 +284,9 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     <table>
       <thead>
         <tr>
-          <th style="width:26%">Produto</th>
+          <th style="width:24%">Produto</th>
           <th>Filial</th>
+          <th>Status</th>
           <th>Un.</th>
           <th>Qtd</th>
           <th id="thDias" style="cursor:pointer">Dias a vencer &#8645;</th>
@@ -297,7 +303,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       <tbody id="tbody"></tbody>
       <tfoot>
         <tr>
-          <td colspan="8" style="text-align:right">Totais (itens filtrados):</td>
+          <td colspan="9" style="text-align:right">Totais (itens filtrados):</td>
           <td class="readonly" id="footCusto">-</td>
           <td class="readonly" id="footVenda">-</td>
           <td class="readonly" id="footMarkup">-</td>
@@ -410,14 +416,15 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   }
 
   var items = loadItems();
-  items.forEach(function(it, idx){ it._id = idx + '-' + Math.random().toString(36).slice(2,8); });
+  items.forEach(function(it, idx){ it._id = idx + '-' + Math.random().toString(36).slice(2,8); if(!it.st) it.st = 'normal'; });
 
   function saveItems(){
     try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(items.map(stripId))); }catch(e){}
   }
   function stripId(it){
-    return {p:it.p,f:it.f,u:it.u,q:it.q,d:it.d,v:it.v,c:it.c,s:it.s};
+    return {p:it.p,f:it.f,u:it.u,q:it.q,d:it.d,v:it.v,c:it.c,s:it.s,st:it.st};
   }
+  function isAvaria(it){ return it.st === 'avaria'; }
 
   function parseNum(s){
     if(typeof s === 'number') return s;
@@ -472,7 +479,12 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   }
 
   function getFiltered(){
-    var list = baseFiltered().filter(function(it){ return activeBands.has(bandKey(it.d)); });
+    var filStatus = document.getElementById('filStatus').value;
+    var list = baseFiltered().filter(function(it){
+      if(!activeBands.has(bandKey(it.d))) return false;
+      if(filStatus && (it.st || 'normal') !== filStatus) return false;
+      return true;
+    });
     list.sort(function(a,b){
       var da = (a.d === null || a.d === undefined) ? 9999 : a.d;
       var db = (b.d === null || b.d === undefined) ? 9999 : b.d;
@@ -513,9 +525,11 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
 
   function searchAndBandFiltered(){
     var busca = document.getElementById('filBusca').value.trim().toLowerCase();
+    var filStatus = document.getElementById('filStatus').value;
     return items.filter(function(it){
       if(busca && it.p.toLowerCase().indexOf(busca) === -1) return false;
       if(!activeBands.has(bandKey(it.d))) return false;
+      if(filStatus && (it.st || 'normal') !== filStatus) return false;
       return true;
     });
   }
@@ -564,8 +578,8 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     if(list.length === 0){
       var tr = document.createElement('tr');
       var td = document.createElement('td');
-      td.colSpan = 13; td.className = 'empty';
-      td.textContent = 'Nenhum item nessa selecao. Ajuste os filtros de dias a vencer, filial ou busca.';
+      td.colSpan = 14; td.className = 'empty';
+      td.textContent = 'Nenhum item nessa selecao. Ajuste os filtros de dias a vencer, filial, status ou busca.';
       tr.appendChild(td); tbody.appendChild(tr);
     }
     var sumCusto = 0, sumVenda = 0, hasVenda = false;
@@ -576,6 +590,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
 
       tr.appendChild(cellInput('produto', it, 'p', 'text'));
       tr.appendChild(cellSelect(it, 'f', [['1','Filial 1'],['3','Filial 3']]));
+      tr.appendChild(cellSelect(it, 'st', [['normal','Normal'],['avaria','Avaria']]));
       tr.appendChild(cellSelect(it, 'u', [['KG','KG'],['UN','UN'],['PC','PC']]));
       tr.appendChild(cellInput('num', it, 'q', 'number'));
       tr.appendChild(diasCell(it));
@@ -618,7 +633,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
 
     renderLegend();
     renderFilialSummary();
-    renderCards(list);
+    renderCards(list, baseFiltered());
   }
 
   function diasCell(it){
@@ -639,7 +654,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     return td;
   }
 
-  function renderCards(list){
+  function renderCards(list, statusBase){
     var totalItens = list.length;
     var totalCusto = list.reduce(function(s,it){ return s + (it.q||0)*(it.c||0); }, 0);
     var vencidos = list.filter(function(it){ return it.d !== null && it.d !== undefined && it.d < 0; }).length;
@@ -654,6 +669,16 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     cards.appendChild(makeCard('Itens criticos (0-9 dias)', criticos, criticos > 0));
     cards.appendChild(makeCard('Valor total (custo)', fmtMoney(totalCusto), false));
     cards.appendChild(makeCard('Valor total (venda)', comVenda.length ? fmtMoney(totalVenda) : '-', false));
+
+    if(statusBase){
+      var avariaItens = statusBase.filter(isAvaria);
+      var normalItens = statusBase.filter(function(it){ return !isAvaria(it); });
+      var custoAvaria = avariaItens.reduce(function(s,it){ return s + (it.q||0)*(it.c||0); }, 0);
+      var custoNormal = normalItens.reduce(function(s,it){ return s + (it.q||0)*(it.c||0); }, 0);
+      var pctAvaria = custoNormal ? (custoAvaria / custoNormal * 100) : (custoAvaria ? null : 0);
+      cards.appendChild(makeCard('Itens em avaria', avariaItens.length, avariaItens.length > 0));
+      cards.appendChild(makeCard('Avaria (custo) vs normal', pctAvaria === null ? '-' : pctAvaria.toFixed(1) + '%', avariaItens.length > 0));
+    }
   }
   function makeCard(label, value, crit){
     var div = document.createElement('div'); div.className = 'card' + (crit ? ' crit' : '');
@@ -696,11 +721,12 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   }
 
   document.getElementById('filFilial').addEventListener('change', render);
+  document.getElementById('filStatus').addEventListener('change', render);
   document.getElementById('filBusca').addEventListener('input', render);
   document.getElementById('thDias').addEventListener('click', function(){ sortAsc = !sortAsc; render(); });
 
   document.getElementById('btnAdd').addEventListener('click', function(){
-    items.push({_id: 'n-' + Math.random().toString(36).slice(2,8), p:'Novo produto', f:'1', u:'KG', q:0, d:0, v:'', c:0, s:null});
+    items.push({_id: 'n-' + Math.random().toString(36).slice(2,8), p:'Novo produto', f:'1', st:'normal', u:'KG', q:0, d:0, v:'', c:0, s:null});
     saveItems(); render();
   });
 
@@ -731,6 +757,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
         _id: 'n-' + Math.random().toString(36).slice(2,8),
         p: produto,
         f: (cols[1]||'1').trim().replace(/[^13]/g,'') || '1',
+        st: 'normal',
         u: (cols[2]||'KG').trim().toUpperCase(),
         q: parseNum(cols[3]) || 0,
         d: parseNum(cols[4]) || 0,
@@ -796,7 +823,9 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       var parsed = JSON.parse(json);
       if(!Array.isArray(parsed)) throw new Error('formato invalido');
       items = parsed.map(function(it, idx){
-        return Object.assign({_id: idx + '-' + Math.random().toString(36).slice(2,8)}, it);
+        var merged = Object.assign({_id: idx + '-' + Math.random().toString(36).slice(2,8)}, it);
+        if(!merged.st) merged.st = 'normal';
+        return merged;
       });
       saveItems(); render();
       alert('Backup restaurado: ' + items.length + ' itens.');
@@ -879,6 +908,26 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     return String(val).trim();
   }
   function pad2(n){ return (n < 10 ? '0' : '') + n; }
+
+  /* Nas rotinas 8080/1707, o relatorio agrupa os itens sob linhas-titulo tipo
+     "PRODUTO NORMAL" ou "AVARIA". Essas linhas tem poucas celulas preenchidas
+     (so o rotulo). Detecta esse marcador pra taguear os itens seguintes ate
+     o proximo marcador. */
+  function detectStatusMarker(row){
+    if(!row) return null;
+    var filled = 0, text = '';
+    for(var i=0; i<row.length; i++){
+      var c = row[i];
+      if(c !== null && c !== undefined && String(c).trim() !== ''){
+        filled++;
+        text += ' ' + String(c).trim().toUpperCase();
+      }
+    }
+    if(filled === 0 || filled > 3) return null;
+    if(text.indexOf('AVARIA') > -1) return 'avaria';
+    if(text.indexOf('NORMAL') > -1) return 'normal';
+    return null;
+  }
 
   function detectFefoColumns(rows){
     var headerRowIdx = -1, map = {};
@@ -1007,9 +1056,12 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
           return;
         }
         var startRow = cfg.headerRowIdx >= 0 ? cfg.headerRowIdx + 1 : 0;
+        var currentStatus = 'normal';
         for(var r=startRow; r<frows.length; r++){
           var row = frows[r];
           if(!row) continue;
+          var marker = detectStatusMarker(row);
+          if(marker){ currentStatus = marker; continue; }
           var prodStr, code, un;
           if(cfg.style === '1707'){
             if(row[cfg.map.cod] === null || row[cfg.map.cod] === undefined) continue;
@@ -1045,7 +1097,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
             status = 'warn'; filial = matches[0].filial; custo = matches[0].custo; venda = matches[0].venda;
             note = 'Codigo em ' + matches.length + ' filiais - confira';
           }
-          previewItems.push({p: prodStr, f: filial, u: un, q: qtd, d: dias, v: valid, c: custo, s: venda, status: status, note: note});
+          previewItems.push({p: prodStr, f: filial, u: un, q: qtd, d: dias, v: valid, c: custo, s: venda, st: currentStatus, status: status, note: note});
         }
       }
 
@@ -1074,6 +1126,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       tr.appendChild(td(it.v || '-'));
       tr.appendChild(td(it.c === null ? '-' : it.c));
       tr.appendChild(td(it.s === null ? '-' : it.s));
+      tr.appendChild(td(it.st === 'avaria' ? 'Avaria' : 'Normal'));
       var tdStatus = document.createElement('td');
       var badge = document.createElement('span');
       if(it.status === 'ok'){ badge.className = 'badge ok'; badge.textContent = 'OK'; }
@@ -1101,7 +1154,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   });
   function commitPreview(replace){
     var toAdd = previewItems.map(function(it){
-      return {_id:'n-'+Math.random().toString(36).slice(2,8), p:it.p, f:it.f||'1', u:it.u, q:it.q, d:it.d, v:it.v, c:it.c||0, s:it.s};
+      return {_id:'n-'+Math.random().toString(36).slice(2,8), p:it.p, f:it.f||'1', st:it.st||'normal', u:it.u, q:it.q, d:it.d, v:it.v, c:it.c||0, s:it.s};
     });
     items = replace ? toAdd : items.concat(toAdd);
     previewItems = [];

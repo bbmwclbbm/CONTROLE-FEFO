@@ -73,7 +73,9 @@ button:disabled{opacity:.5;cursor:not-allowed;}
 .chip.active{background:var(--surface-2);color:var(--text);border-color:var(--chip-color, var(--border-strong));font-weight:600;}
 .dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
 .tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface);}
-table{border-collapse:collapse;width:100%;min-width:1180px;font-size:13px;}
+table{border-collapse:collapse;width:100%;min-width:1620px;font-size:13px;}
+th.col-status, td.status{min-width:92px;}
+th.col-loc, td.loc input{min-width:110px;}
 th{
   background:var(--surface-2);color:var(--text-secondary);font-weight:600;font-size:11.5px;
   text-transform:uppercase;letter-spacing:.02em;text-align:left;padding:9px 8px;border-bottom:1px solid var(--border);
@@ -235,10 +237,10 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     <h2 class="section-title">Pre-visualizacao do cruzamento</h2>
     <div id="previewSummary" class="hint"></div>
     <div class="tablewrap">
-      <table id="previewTable" style="min-width:900px">
+      <table id="previewTable" style="min-width:1100px">
         <thead>
           <tr>
-            <th>Produto</th><th>Filial</th><th>Un.</th><th>Qtd</th><th>Dias</th><th>Validade</th>
+            <th>Produto</th><th>Filial</th><th>Localizacao</th><th>Un.</th><th>Qtd</th><th>Bloqueado</th><th>Pendente</th><th>Dias</th><th>Validade</th>
             <th>Custo +ICMS</th><th>Preco venda</th><th>Tipo</th><th>Status</th>
           </tr>
         </thead>
@@ -281,15 +283,25 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     <input type="text" id="filBusca" placeholder="Buscar produto...">
   </div>
 
+  <div class="legend" id="quickFilters">
+    <button type="button" class="chip" id="qfAvaria">Ir pra Avaria</button>
+    <button type="button" class="chip" id="qfBloqueado">Ir pra Bloqueado</button>
+    <button type="button" class="chip" id="qfPendente">Ir pra Pendente</button>
+    <button type="button" class="chip" id="qfClear">Limpar atalhos</button>
+  </div>
+
   <div class="tablewrap">
     <table>
       <thead>
         <tr>
-          <th style="width:24%">Produto</th>
+          <th style="width:20%">Produto</th>
           <th>Filial</th>
-          <th>Status</th>
+          <th class="col-status">Status</th>
+          <th class="col-loc">Localizacao</th>
           <th>Un.</th>
           <th>Qtd</th>
+          <th>Bloqueado</th>
+          <th>Pendente</th>
           <th id="thDias" style="cursor:pointer">Dias a vencer &#8645;</th>
           <th>Validade</th>
           <th>Custo +ICMS (R$)</th>
@@ -304,7 +316,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       <tbody id="tbody"></tbody>
       <tfoot>
         <tr>
-          <td colspan="9" style="text-align:right">Totais (itens filtrados):</td>
+          <td colspan="12" style="text-align:right">Totais (itens filtrados):</td>
           <td class="readonly" id="footCusto">-</td>
           <td class="readonly" id="footVenda">-</td>
           <td class="readonly" id="footMarkup">-</td>
@@ -429,6 +441,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   })();
 
   var sortAsc = true;
+  var activeQuickFilter = null;
   var custoFiles = [];
   var fefoFiles = [];
   var previewItems = [];
@@ -506,10 +519,10 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     if(dbReady) syncToDb();
   }
   function stripId(it){
-    return {_id:it._id, p:it.p,f:it.f,u:it.u,q:it.q,d:it.d,v:it.v,c:it.c,s:it.s,st:it.st};
+    return {_id:it._id, p:it.p,f:it.f,u:it.u,q:it.q,d:it.d,v:it.v,c:it.c,s:it.s,st:it.st,loc:it.loc,bloq:it.bloq,pend:it.pend};
   }
   function dbBody(it){
-    return {p:it.p,f:it.f,u:it.u,q:it.q,d:it.d,v:it.v,c:it.c,s:it.s,st:it.st};
+    return {p:it.p,f:it.f,u:it.u,q:it.q,d:it.d,v:it.v,c:it.c,s:it.s,st:it.st,loc:it.loc,bloq:it.bloq,pend:it.pend};
   }
   function isAvaria(it){ return it.st === 'avaria'; }
 
@@ -706,6 +719,8 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     var list = baseFiltered().filter(function(it){
       if(!activeBands.has(bandKey(it.d))) return false;
       if(filStatus && (it.st || 'normal') !== filStatus) return false;
+      if(activeQuickFilter === 'bloqueado' && !(it.bloq > 0)) return false;
+      if(activeQuickFilter === 'pendente' && !(it.pend > 0)) return false;
       return true;
     });
     list.sort(function(a,b){
@@ -753,6 +768,8 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       if(busca && it.p.toLowerCase().indexOf(busca) === -1) return false;
       if(!activeBands.has(bandKey(it.d))) return false;
       if(filStatus && (it.st || 'normal') !== filStatus) return false;
+      if(activeQuickFilter === 'bloqueado' && !(it.bloq > 0)) return false;
+      if(activeQuickFilter === 'pendente' && !(it.pend > 0)) return false;
       return true;
     });
   }
@@ -801,7 +818,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     if(list.length === 0){
       var tr = document.createElement('tr');
       var td = document.createElement('td');
-      td.colSpan = 14; td.className = 'empty';
+      td.colSpan = 17; td.className = 'empty';
       td.textContent = 'Nenhum item nessa selecao. Ajuste os filtros de dias a vencer, filial, status ou busca.';
       tr.appendChild(td); tbody.appendChild(tr);
     }
@@ -814,8 +831,11 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       tr.appendChild(cellInput('produto', it, 'p', 'text'));
       tr.appendChild(cellSelect(it, 'f', [['1','Filial 1'],['3','Filial 3']]));
       tr.appendChild(cellSelect(it, 'st', [['normal','Normal'],['avaria','Avaria']]));
+      tr.appendChild(cellInput('loc', it, 'loc', 'text', true));
       tr.appendChild(cellSelect(it, 'u', [['KG','KG'],['UN','UN'],['PC','PC']]));
       tr.appendChild(cellInput('num', it, 'q', 'number'));
+      tr.appendChild(cellInput('num', it, 'bloq', 'number', true));
+      tr.appendChild(cellInput('num', it, 'pend', 'number', true));
       tr.appendChild(diasCell(it));
       tr.appendChild(cellInput('', it, 'v', 'text'));
       tr.appendChild(cellInput('num', it, 'c', 'number'));
@@ -855,6 +875,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     document.getElementById('footMargem').textContent = margemTotal === null ? '-' : margemTotal.toFixed(1) + '%';
 
     renderLegend();
+    renderQuickFilters();
     renderFilialSummary();
     renderCards(list, baseFiltered());
   }
@@ -944,9 +965,40 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   }
 
   document.getElementById('filFilial').addEventListener('change', render);
-  document.getElementById('filStatus').addEventListener('change', render);
+  document.getElementById('filStatus').addEventListener('change', function(){ activeQuickFilter = null; render(); });
   document.getElementById('filBusca').addEventListener('input', render);
   document.getElementById('thDias').addEventListener('click', function(){ sortAsc = !sortAsc; render(); });
+
+  function scrollToTable(){
+    var el = document.querySelector('.tablewrap');
+    if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+  document.getElementById('qfAvaria').addEventListener('click', function(){
+    activeQuickFilter = null;
+    document.getElementById('filStatus').value = 'avaria';
+    render(); scrollToTable();
+  });
+  document.getElementById('qfBloqueado').addEventListener('click', function(){
+    activeQuickFilter = 'bloqueado';
+    document.getElementById('filStatus').value = '';
+    render(); scrollToTable();
+  });
+  document.getElementById('qfPendente').addEventListener('click', function(){
+    activeQuickFilter = 'pendente';
+    document.getElementById('filStatus').value = '';
+    render(); scrollToTable();
+  });
+  document.getElementById('qfClear').addEventListener('click', function(){
+    activeQuickFilter = null;
+    document.getElementById('filStatus').value = '';
+    render();
+  });
+  function renderQuickFilters(){
+    var filStatus = document.getElementById('filStatus').value;
+    document.getElementById('qfAvaria').classList.toggle('active', filStatus === 'avaria');
+    document.getElementById('qfBloqueado').classList.toggle('active', activeQuickFilter === 'bloqueado');
+    document.getElementById('qfPendente').classList.toggle('active', activeQuickFilter === 'pendente');
+  }
 
   document.getElementById('btnAdd').addEventListener('click', function(){
     items.push({_id: 'n-' + Math.random().toString(36).slice(2,8), p:'Novo produto', f:'1', st:'normal', u:'KG', q:0, d:0, v:'', c:0, s:null});
@@ -1134,10 +1186,11 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   function pad2(n){ return (n < 10 ? '0' : '') + n; }
 
   /* Rotina 1707 (Consultas Auxiliares - Validade). Layout observado (colunas
-     contadas a partir de 0 = A): col0=codigo, col1=descricao, col7=status
-     (Normal/Avaria), col9=data validade (Dt. Ven.), col10=(Dias) Vencimento,
-     col16=Disponivel (quantidade). Sem coluna de unidade. */
-  var COL_1707_DEFAULT = {cod:0, desc:1, status:7, valid:9, dias:10, qtd:16};
+     contadas a partir de 0 = A): col0=codigo, col1=descricao, col2=dep,
+     col3=rua, col4=predio, col5/col6=nivel, col7=status (Normal/Avaria),
+     col9=data validade (Dt. Ven.), col10=(Dias) Vencimento, col16=Disponivel
+     (quantidade). Sem coluna de unidade. */
+  var COL_1707_DEFAULT = {cod:0, desc:1, dep:2, rua:3, predio:4, nivel1:5, nivel2:6, status:7, valid:9, dias:10, qtd:16};
 
   function looksLike1707(rows){
     for(var i=0; i<Math.min(rows.length, 5); i++){
@@ -1183,8 +1236,12 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
      lidos (arrays de linhas), retornando os itens resultantes. Usado tanto
      pelo botao manual de importacao quanto pela leitura automatica dos
      arquivos do repositorio. costFiles/fefoFiles: [{rows, filial, name}]. */
+  /* Colunas do 8211 (Controle de Estoque por Custo Financeiro), a partir de 0
+     = A: col0=produto (codigo - descricao), col1=un, col4=geral (estoque),
+     col7=bloqueado, col8=pendente, col12=custo +ICMS, col14=preco venda. */
   function crossReference(costFiles, fefoFiles, cols){
     var prodCol = cols.prodCol, custoCol = cols.custoCol, vendaCol = cols.vendaCol;
+    var unCol = cols.unCol, bloqCol = cols.bloqCol, pendCol = cols.pendCol;
     var costIndex = {};
     costFiles.forEach(function(cf){
       var filial = cf.filial || guessFilialFromName(cf.name) || '?';
@@ -1195,8 +1252,11 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
         var code = prodStr.split(' - ')[0].trim();
         var custo = parseNum(row[custoCol]);
         var venda = parseNum(row[vendaCol]);
+        var un = (unCol !== undefined && row[unCol]) ? String(row[unCol]).trim().toUpperCase() : null;
+        var bloq = bloqCol !== undefined ? parseNum(row[bloqCol]) : null;
+        var pend = pendCol !== undefined ? parseNum(row[pendCol]) : null;
         if(!costIndex[code]) costIndex[code] = [];
-        costIndex[code].push({filial: filial, custo: custo, venda: venda});
+        costIndex[code].push({filial: filial, custo: custo, venda: venda, un: un, bloq: bloq, pend: pend});
       });
     });
 
@@ -1218,7 +1278,6 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
         if(code === '') continue;
         var desc = row[cfg.map.desc] === null ? '' : String(row[cfg.map.desc]).trim();
         var prodStr = code + ' - ' + desc;
-        var un = 'KG';
 
         var qtd = parseNum(row[cfg.map.qtd]);
         if(qtd === null) continue;
@@ -1228,23 +1287,40 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
           ? String(row[cfg.map.status]).trim().toUpperCase() : '';
         var itemStatus = statusRaw.indexOf('AVARIA') > -1 ? 'avaria' : 'normal';
 
+        var loc = '';
+        if(cfg.map.rua !== undefined){
+          var rua = row[cfg.map.rua], predio = row[cfg.map.predio], n1 = row[cfg.map.nivel1], n2 = row[cfg.map.nivel2];
+          var parts = [];
+          if(rua !== null && rua !== undefined) parts.push('R' + rua);
+          if(predio !== null && predio !== undefined) parts.push('P' + predio);
+          if((n1 !== null && n1 !== undefined) || (n2 !== null && n2 !== undefined)){
+            parts.push('N' + (n1 === null || n1 === undefined ? '0' : n1) + '.' + (n2 === null || n2 === undefined ? '0' : n2));
+          }
+          loc = parts.join(' ');
+        }
+
         var matches = costIndex[code] || [];
-        var status = 'bad', filial = fileFilial, custo = null, venda = null, note = 'Nao encontrado no 8211';
+        var status = 'bad', filial = fileFilial, custo = null, venda = null, un = 'KG', bloq = null, pend = null, note = 'Nao encontrado no 8211';
+        var pick = null;
         if(fileFilial){
           var exact = matches.filter(function(m){ return m.filial === fileFilial; });
           if(exact.length){
-            status = 'ok'; custo = exact[0].custo; venda = exact[0].venda; note = 'OK';
+            status = 'ok'; pick = exact[0]; note = 'OK';
           } else if(matches.length){
-            status = 'warn'; custo = matches[0].custo; venda = matches[0].venda;
+            status = 'warn'; pick = matches[0];
             note = 'Sem custo na filial ' + fileFilial + ' - usando o da filial ' + matches[0].filial;
           }
         } else if(matches.length === 1){
-          status = 'ok'; filial = matches[0].filial; custo = matches[0].custo; venda = matches[0].venda; note = 'OK';
+          status = 'ok'; filial = matches[0].filial; pick = matches[0]; note = 'OK';
         } else if(matches.length > 1){
-          status = 'warn'; filial = matches[0].filial; custo = matches[0].custo; venda = matches[0].venda;
+          status = 'warn'; filial = matches[0].filial; pick = matches[0];
           note = 'Codigo em ' + matches.length + ' filiais - confira';
         }
-        result.push({p: prodStr, f: filial, u: un, q: qtd, d: dias, v: valid, c: custo, s: venda, st: itemStatus, status: status, note: note});
+        if(pick){
+          custo = pick.custo; venda = pick.venda; bloq = pick.bloq; pend = pick.pend;
+          if(pick.un) un = pick.un;
+        }
+        result.push({p: prodStr, f: filial, u: un, q: qtd, d: dias, v: valid, c: custo, s: venda, st: itemStatus, loc: loc, bloq: bloq, pend: pend, status: status, note: note});
       }
     }
     return {items: result};
@@ -1260,7 +1336,8 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       var cols = {
         prodCol: parseInt(document.getElementById('colCustoProd').value, 10),
         custoCol: parseInt(document.getElementById('colCustoValor').value, 10),
-        vendaCol: parseInt(document.getElementById('colVendaValor').value, 10)
+        vendaCol: parseInt(document.getElementById('colVendaValor').value, 10),
+        unCol: 1, bloqCol: 7, pendCol: 8
       };
 
       var costFilesRead = [];
@@ -1331,7 +1408,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
         return;
       }
 
-      var cols = {prodCol: 0, custoCol: 12, vendaCol: 14};
+      var cols = {prodCol: 0, custoCol: 12, vendaCol: 14, unCol: 1, bloqCol: 7, pendCol: 8};
       var res = crossReference(costFilesRead, fefoFilesRead, cols);
       if(res.error || !res.items || res.items.length === 0){
         setAutoLoadBanner(res.error || 'Os arquivos do repositorio nao produziram nenhum item - os dados atuais foram mantidos.');
@@ -1339,7 +1416,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       }
 
       items = res.items.map(function(it){
-        return {_id:'auto-'+Math.random().toString(36).slice(2,10), p:it.p, f:it.f||'1', st:it.st||'normal', u:it.u, q:it.q, d:it.d, v:it.v, c:it.c||0, s:it.s};
+        return {_id:'auto-'+Math.random().toString(36).slice(2,10), p:it.p, f:it.f||'1', st:it.st||'normal', u:it.u, q:it.q, d:it.d, v:it.v, c:it.c||0, s:it.s, loc:it.loc, bloq:it.bloq, pend:it.pend};
       });
       saveItems(); render();
       touchImportMeta(items.length, 'replace');
@@ -1373,8 +1450,11 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       function td(text){ var d = document.createElement('td'); d.textContent = text; return d; }
       tr.appendChild(td(it.p));
       tr.appendChild(td(it.f ? 'Filial ' + it.f : '-'));
+      tr.appendChild(td(it.loc || '-'));
       tr.appendChild(td(it.u));
       tr.appendChild(td(it.q));
+      tr.appendChild(td(it.bloq ? it.bloq : '-'));
+      tr.appendChild(td(it.pend ? it.pend : '-'));
       tr.appendChild(td(it.d === null ? '-' : it.d));
       tr.appendChild(td(it.v || '-'));
       tr.appendChild(td(it.c === null ? '-' : it.c));
@@ -1407,7 +1487,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   });
   function commitPreview(replace){
     var toAdd = previewItems.map(function(it){
-      return {_id:'n-'+Math.random().toString(36).slice(2,8), p:it.p, f:it.f||'1', st:it.st||'normal', u:it.u, q:it.q, d:it.d, v:it.v, c:it.c||0, s:it.s};
+      return {_id:'n-'+Math.random().toString(36).slice(2,8), p:it.p, f:it.f||'1', st:it.st||'normal', u:it.u, q:it.q, d:it.d, v:it.v, c:it.c||0, s:it.s, loc:it.loc, bloq:it.bloq, pend:it.pend};
     });
     items = replace ? toAdd : items.concat(toAdd);
     previewItems = [];

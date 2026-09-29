@@ -72,10 +72,9 @@ button:disabled{opacity:.5;cursor:not-allowed;}
 .chip:hover{background:var(--surface-2);}
 .chip.active{background:var(--surface-2);color:var(--text);border-color:var(--chip-color, var(--border-strong));font-weight:600;}
 .dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
-.tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface);}
-table{border-collapse:collapse;width:100%;min-width:1820px;font-size:13px;}
+.tablewrap{overflow:auto;max-height:calc(100vh - 120px);border:1px solid var(--border);border-radius:10px;background:var(--surface);}
+table{border-collapse:collapse;width:100%;min-width:1540px;font-size:13px;}
 th.col-status, td.status{min-width:92px;}
-th.col-loc, td.loc input{min-width:110px;}
 th{
   background:var(--surface-2);color:var(--text-secondary);font-weight:600;font-size:11.5px;
   text-transform:uppercase;letter-spacing:.02em;text-align:left;padding:9px 8px;border-bottom:1px solid var(--border);
@@ -89,7 +88,11 @@ td input, td select{
 }
 td input:hover, td select:hover{border-color:var(--border-strong);}
 td input:focus, td select:focus{border-color:var(--accent);outline:none;background:var(--surface);}
-td.produto input{min-width:420px;}
+td.produto{max-width:260px;}
+button.produto-view{display:block;width:100%;max-width:240px;text-align:left;background:transparent;
+  border:1px solid transparent;border-radius:6px;color:var(--text);font-size:13px;padding:5px 6px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;}
+button.produto-view:hover{border-color:var(--border-strong);background:var(--surface-2);}
 td.num input{text-align:right;width:80px;}
 td.readonly{text-align:right;color:var(--text-secondary);white-space:nowrap;font-variant-numeric:tabular-nums;}
 td.rm{text-align:center;}
@@ -240,7 +243,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       <table id="previewTable" style="min-width:1100px">
         <thead>
           <tr>
-            <th>Produto</th><th>Filial</th><th>Localizacao</th><th>Un.</th><th>Qtd</th><th>Bloqueado</th><th>Pendente</th><th>Dias</th><th>Validade</th>
+            <th>Produto</th><th>Filial</th><th>Un.</th><th>Qtd</th><th>Bloqueado</th><th>Pendente</th><th>Dias</th><th>Validade</th>
             <th>Custo +ICMS</th><th>Preço venda</th><th>Tipo</th><th>Status</th>
           </tr>
         </thead>
@@ -297,7 +300,6 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
           <th style="width:20%">Produto</th>
           <th>Filial</th>
           <th class="col-status">Status</th>
-          <th class="col-loc">Localizacao</th>
           <th>Un.</th>
           <th>Qtd</th>
           <th>Bloqueado</th>
@@ -316,7 +318,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       <tbody id="tbody"></tbody>
       <tfoot>
         <tr>
-          <td colspan="12" style="text-align:right">Totais (itens filtrados):</td>
+          <td colspan="11" style="text-align:right">Totais (itens filtrados):</td>
           <td class="readonly" id="footCusto">-</td>
           <td class="readonly" id="footVenda">-</td>
           <td class="readonly" id="footMarkup">-</td>
@@ -381,12 +383,12 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     confirmBtn.addEventListener('click', onConfirmClick);
     cancelBtn.addEventListener('click', onCancelClick);
   }
-  function showPrompt(message, onSubmit){
+  function showPrompt(message, onSubmit, initial){
     var overlay = document.getElementById('modalOverlay');
     document.getElementById('modalMessage').textContent = message;
     var input = document.getElementById('modalInput');
     input.style.display = '';
-    input.value = '';
+    input.value = initial || '';
     var confirmBtn = document.getElementById('modalConfirmBtn');
     var cancelBtn = document.getElementById('modalCancelBtn');
     confirmBtn.textContent = 'OK';
@@ -518,10 +520,10 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     if(dbReady) syncToDb();
   }
   function stripId(it){
-    return {_id:it._id, p:it.p,f:it.f,u:it.u,q:it.q,d:it.d,v:it.v,c:it.c,s:it.s,st:it.st,loc:it.loc,bloq:it.bloq,pend:it.pend};
+    return {_id:it._id, p:it.p,f:it.f,u:it.u,q:it.q,d:it.d,v:it.v,c:it.c,s:it.s,st:it.st,bloq:it.bloq,pend:it.pend};
   }
   function dbBody(it){
-    return {p:it.p,f:it.f,u:it.u,q:it.q,d:it.d,v:it.v,c:it.c,s:it.s,st:it.st,loc:it.loc,bloq:it.bloq,pend:it.pend};
+    return {p:it.p,f:it.f,u:it.u,q:it.q,d:it.d,v:it.v,c:it.c,s:it.s,st:it.st,bloq:it.bloq,pend:it.pend};
   }
   function isAvaria(it){ return it.st === 'avaria'; }
 
@@ -824,7 +826,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     if(list.length === 0){
       var tr = document.createElement('tr');
       var td = document.createElement('td');
-      td.colSpan = 17; td.className = 'empty';
+      td.colSpan = 16; td.className = 'empty';
       td.textContent = 'Nenhum item nessa selecao. Ajuste os filtros de dias a vencer, filial, status ou busca.';
       tr.appendChild(td); tbody.appendChild(tr);
     }
@@ -834,11 +836,10 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       tr.className = 'band-' + bandKey(it.d);
       tr.dataset.id = it._id;
 
-      tr.appendChild(cellInput('produto', it, 'p', 'text'));
+      tr.appendChild(produtoCell(it));
       tr.appendChild(cellSelect(it, 'f', [['1','Filial 1'],['3','Filial 3']]));
       tr.appendChild(cellSelect(it, 'st', [['normal','Normal'],['avaria','Avaria']]));
-      tr.appendChild(cellInput('loc', it, 'loc', 'text', true));
-      tr.appendChild(cellSelect(it, 'u', [['KG','KG'],['UN','UN'],['PC','PC']]));
+      tr.appendChild(cellSelect(it, 'u', [['KG','KG'],['UN','UN'],['L','L'],['PC','PC']]));
       tr.appendChild(cellInput('num', it, 'q', 'number'));
       tr.appendChild(cellInput('num', it, 'bloq', 'number', true));
       tr.appendChild(cellInput('num', it, 'pend', 'number', true));
@@ -935,6 +936,28 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     var v = document.createElement('div'); v.className = 'value'; v.textContent = value;
     div.appendChild(l); div.appendChild(v);
     return div;
+  }
+
+  /* Nome do produto: mostra truncado (com reticencias) pra nao alargar a
+     tabela toda, e um clique abre o texto completo (editavel) no modal -
+     assim cabe tudo na tela sem precisar rolar so por causa do nome. */
+  function produtoCell(it){
+    var td = document.createElement('td'); td.className = 'produto';
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'produto-view';
+    btn.textContent = it.p;
+    btn.title = 'Clique para ver/editar o nome completo';
+    btn.addEventListener('click', function(){
+      showPrompt('Nome do produto (editavel):', function(v){
+        if(v !== null && v !== undefined && v.trim() !== ''){
+          it.p = v.trim();
+          saveItems(); render();
+        }
+      }, it.p);
+    });
+    td.appendChild(btn);
+    return td;
   }
 
   function cellInput(cls, it, field, type, isOptional){
@@ -1165,7 +1188,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
      col3=rua, col4=predio, col5/col6=nivel, col7=status (Normal/Avaria),
      col9=data validade (Dt. Ven.), col10=(Dias) Vencimento, col16=Disponivel
      (quantidade). Sem coluna de unidade. */
-  var COL_1707_DEFAULT = {cod:0, desc:1, dep:2, rua:3, predio:4, nivel1:5, nivel2:6, status:7, valid:9, dias:10, qtd:16};
+  var COL_1707_DEFAULT = {cod:0, desc:1, status:7, valid:9, dias:10, qtd:16};
 
   function looksLike1707(rows){
     for(var i=0; i<Math.min(rows.length, 5); i++){
@@ -1262,18 +1285,6 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
           ? String(row[cfg.map.status]).trim().toUpperCase() : '';
         var itemStatus = statusRaw.indexOf('AVARIA') > -1 ? 'avaria' : 'normal';
 
-        var loc = '';
-        if(cfg.map.rua !== undefined){
-          var rua = row[cfg.map.rua], predio = row[cfg.map.predio], n1 = row[cfg.map.nivel1], n2 = row[cfg.map.nivel2];
-          var parts = [];
-          if(rua !== null && rua !== undefined) parts.push('R' + rua);
-          if(predio !== null && predio !== undefined) parts.push('P' + predio);
-          if((n1 !== null && n1 !== undefined) || (n2 !== null && n2 !== undefined)){
-            parts.push('N' + (n1 === null || n1 === undefined ? '0' : n1) + '.' + (n2 === null || n2 === undefined ? '0' : n2));
-          }
-          loc = parts.join(' ');
-        }
-
         var matches = costIndex[code] || [];
         var status = 'bad', filial = fileFilial, custo = null, venda = null, un = 'KG', bloq = null, pend = null, note = 'Nao encontrado no 8211';
         var pick = null;
@@ -1295,7 +1306,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
           custo = pick.custo; venda = pick.venda; bloq = pick.bloq; pend = pick.pend;
           if(pick.un) un = pick.un;
         }
-        result.push({p: prodStr, f: filial, u: un, q: qtd, d: dias, v: valid, c: custo, s: venda, st: itemStatus, loc: loc, bloq: bloq, pend: pend, status: status, note: note});
+        result.push({p: prodStr, f: filial, u: un, q: qtd, d: dias, v: valid, c: custo, s: venda, st: itemStatus, bloq: bloq, pend: pend, status: status, note: note});
       }
     }
     return {items: result};
@@ -1391,7 +1402,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       }
 
       items = res.items.map(function(it){
-        return {_id:'auto-'+Math.random().toString(36).slice(2,10), p:it.p, f:it.f||'1', st:it.st||'normal', u:it.u, q:it.q, d:it.d, v:it.v, c:it.c||0, s:it.s, loc:it.loc, bloq:it.bloq, pend:it.pend};
+        return {_id:'auto-'+Math.random().toString(36).slice(2,10), p:it.p, f:it.f||'1', st:it.st||'normal', u:it.u, q:it.q, d:it.d, v:it.v, c:it.c||0, s:it.s, bloq:it.bloq, pend:it.pend};
       });
       saveItems(); render();
       touchImportMeta(items.length, 'replace');
@@ -1425,7 +1436,6 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       function td(text){ var d = document.createElement('td'); d.textContent = text; return d; }
       tr.appendChild(td(it.p));
       tr.appendChild(td(it.f ? 'Filial ' + it.f : '-'));
-      tr.appendChild(td(it.loc || '-'));
       tr.appendChild(td(it.u));
       tr.appendChild(td(it.q));
       tr.appendChild(td(it.bloq ? it.bloq : '-'));
@@ -1462,7 +1472,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   });
   function commitPreview(replace){
     var toAdd = previewItems.map(function(it){
-      return {_id:'n-'+Math.random().toString(36).slice(2,8), p:it.p, f:it.f||'1', st:it.st||'normal', u:it.u, q:it.q, d:it.d, v:it.v, c:it.c||0, s:it.s, loc:it.loc, bloq:it.bloq, pend:it.pend};
+      return {_id:'n-'+Math.random().toString(36).slice(2,8), p:it.p, f:it.f||'1', st:it.st||'normal', u:it.u, q:it.q, d:it.d, v:it.v, c:it.c||0, s:it.s, bloq:it.bloq, pend:it.pend};
     });
     items = replace ? toAdd : items.concat(toAdd);
     previewItems = [];

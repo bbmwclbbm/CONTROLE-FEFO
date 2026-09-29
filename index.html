@@ -280,14 +280,13 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       <option value="normal">Somente normal</option>
       <option value="avaria">Somente avaria</option>
     </select>
+    <select id="filEstoque">
+      <option value="">Bloqueado + Pendente + Livre</option>
+      <option value="bloqueado">Somente bloqueado</option>
+      <option value="pendente">Somente pendente</option>
+      <option value="ambos">Bloqueado ou pendente</option>
+    </select>
     <input type="text" id="filBusca" placeholder="Buscar produto...">
-  </div>
-
-  <div class="legend" id="quickFilters">
-    <button type="button" class="chip" id="qfAvaria">Ir pra Avaria</button>
-    <button type="button" class="chip" id="qfBloqueado">Ir pra Bloqueado</button>
-    <button type="button" class="chip" id="qfPendente">Ir pra Pendente</button>
-    <button type="button" class="chip" id="qfClear">Limpar atalhos</button>
   </div>
 
   <div class="tablewrap">
@@ -441,7 +440,6 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   })();
 
   var sortAsc = true;
-  var activeQuickFilter = null;
   var custoFiles = [];
   var fefoFiles = [];
   var previewItems = [];
@@ -714,13 +712,20 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     });
   }
 
+  function matchesEstoqueFilter(it){
+    var v = document.getElementById('filEstoque').value;
+    if(v === 'bloqueado') return it.bloq > 0;
+    if(v === 'pendente') return it.pend > 0;
+    if(v === 'ambos') return (it.bloq > 0) || (it.pend > 0);
+    return true;
+  }
+
   function getFiltered(){
     var filStatus = document.getElementById('filStatus').value;
     var list = baseFiltered().filter(function(it){
       if(!activeBands.has(bandKey(it.d))) return false;
       if(filStatus && (it.st || 'normal') !== filStatus) return false;
-      if(activeQuickFilter === 'bloqueado' && !(it.bloq > 0)) return false;
-      if(activeQuickFilter === 'pendente' && !(it.pend > 0)) return false;
+      if(!matchesEstoqueFilter(it)) return false;
       return true;
     });
     list.sort(function(a,b){
@@ -768,8 +773,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       if(busca && it.p.toLowerCase().indexOf(busca) === -1) return false;
       if(!activeBands.has(bandKey(it.d))) return false;
       if(filStatus && (it.st || 'normal') !== filStatus) return false;
-      if(activeQuickFilter === 'bloqueado' && !(it.bloq > 0)) return false;
-      if(activeQuickFilter === 'pendente' && !(it.pend > 0)) return false;
+      if(!matchesEstoqueFilter(it)) return false;
       return true;
     });
   }
@@ -875,7 +879,6 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     document.getElementById('footMargem').textContent = margemTotal === null ? '-' : margemTotal.toFixed(1) + '%';
 
     renderLegend();
-    renderQuickFilters();
     renderFilialSummary();
     renderCards(list, baseFiltered());
   }
@@ -965,40 +968,10 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   }
 
   document.getElementById('filFilial').addEventListener('change', render);
-  document.getElementById('filStatus').addEventListener('change', function(){ activeQuickFilter = null; render(); });
+  document.getElementById('filStatus').addEventListener('change', render);
+  document.getElementById('filEstoque').addEventListener('change', render);
   document.getElementById('filBusca').addEventListener('input', render);
   document.getElementById('thDias').addEventListener('click', function(){ sortAsc = !sortAsc; render(); });
-
-  function scrollToTable(){
-    var el = document.querySelector('.tablewrap');
-    if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
-  }
-  document.getElementById('qfAvaria').addEventListener('click', function(){
-    activeQuickFilter = null;
-    document.getElementById('filStatus').value = 'avaria';
-    render(); scrollToTable();
-  });
-  document.getElementById('qfBloqueado').addEventListener('click', function(){
-    activeQuickFilter = 'bloqueado';
-    document.getElementById('filStatus').value = '';
-    render(); scrollToTable();
-  });
-  document.getElementById('qfPendente').addEventListener('click', function(){
-    activeQuickFilter = 'pendente';
-    document.getElementById('filStatus').value = '';
-    render(); scrollToTable();
-  });
-  document.getElementById('qfClear').addEventListener('click', function(){
-    activeQuickFilter = null;
-    document.getElementById('filStatus').value = '';
-    render();
-  });
-  function renderQuickFilters(){
-    var filStatus = document.getElementById('filStatus').value;
-    document.getElementById('qfAvaria').classList.toggle('active', filStatus === 'avaria');
-    document.getElementById('qfBloqueado').classList.toggle('active', activeQuickFilter === 'bloqueado');
-    document.getElementById('qfPendente').classList.toggle('active', activeQuickFilter === 'pendente');
-  }
 
   document.getElementById('btnAdd').addEventListener('click', function(){
     items.push({_id: 'n-' + Math.random().toString(36).slice(2,8), p:'Novo produto', f:'1', st:'normal', u:'KG', q:0, d:0, v:'', c:0, s:null});

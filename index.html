@@ -73,7 +73,7 @@ button:disabled{opacity:.5;cursor:not-allowed;}
 .chip.active{background:var(--surface-2);color:var(--text);border-color:var(--chip-color, var(--border-strong));font-weight:600;}
 .dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
 .tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface);}
-table{border-collapse:collapse;width:100%;min-width:1620px;font-size:13px;}
+table{border-collapse:collapse;width:100%;min-width:1820px;font-size:13px;}
 th.col-status, td.status{min-width:92px;}
 th.col-loc, td.loc input{min-width:110px;}
 th{
@@ -89,7 +89,7 @@ td input, td select{
 }
 td input:hover, td select:hover{border-color:var(--border-strong);}
 td input:focus, td select:focus{border-color:var(--accent);outline:none;background:var(--surface);}
-td.produto input{min-width:220px;}
+td.produto input{min-width:420px;}
 td.num input{text-align:right;width:80px;}
 td.readonly{text-align:right;color:var(--text-secondary);white-space:nowrap;font-variant-numeric:tabular-nums;}
 td.rm{text-align:center;}
@@ -241,7 +241,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
         <thead>
           <tr>
             <th>Produto</th><th>Filial</th><th>Localizacao</th><th>Un.</th><th>Qtd</th><th>Bloqueado</th><th>Pendente</th><th>Dias</th><th>Validade</th>
-            <th>Custo +ICMS</th><th>Preco venda</th><th>Tipo</th><th>Status</th>
+            <th>Custo +ICMS</th><th>Preço venda</th><th>Tipo</th><th>Status</th>
           </tr>
         </thead>
         <tbody id="previewBody"></tbody>
@@ -260,7 +260,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   <div class="panel collapsed" id="pastePanel">
     <div class="hint">
       Cole linhas copiadas do Excel (colunas separadas por TAB), na ordem:<br>
-      <strong>Produto | Filial | Un | Qtd | Dias a Vencer | Validade | Custo | Preco Venda (opcional)</strong>
+      <strong>Produto | Filial | Un | Qtd | Dias a Vencer | Validade | Custo | Preço Venda (opcional)</strong>
     </div>
     <textarea id="pasteArea" placeholder="Cole aqui..."></textarea>
     <div class="actions">
@@ -281,10 +281,11 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       <option value="avaria">Somente avaria</option>
     </select>
     <select id="filEstoque">
-      <option value="">Bloqueado + Pendente + Livre</option>
+      <option value="">Bloqueado + Pendente + Disponivel</option>
       <option value="bloqueado">Somente bloqueado</option>
       <option value="pendente">Somente pendente</option>
       <option value="ambos">Bloqueado ou pendente</option>
+      <option value="disponivel">Somente disponivel (no WMS)</option>
     </select>
     <input type="text" id="filBusca" placeholder="Buscar produto...">
   </div>
@@ -304,7 +305,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
           <th id="thDias" style="cursor:pointer">Dias a vencer &#8645;</th>
           <th>Validade</th>
           <th>Custo +ICMS (R$)</th>
-          <th>Preco venda (R$)</th>
+          <th>Preço venda (R$)</th>
           <th>Total custo (R$)</th>
           <th>Total venda (R$)</th>
           <th>Markup %</th>
@@ -717,6 +718,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     if(v === 'bloqueado') return it.bloq > 0;
     if(v === 'pendente') return it.pend > 0;
     if(v === 'ambos') return (it.bloq > 0) || (it.pend > 0);
+    if(v === 'disponivel') return !(it.bloq > 0) && !(it.pend > 0);
     return true;
   }
 
@@ -1027,7 +1029,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   }
 
   document.getElementById('btnExportCsv').addEventListener('click', async function(){
-    var header = ['Produto','Filial','Un','Qtd','Dias a vencer','Validade','Custo +ICMS','Preco venda','Total custo','Total venda','Markup %','Margem %'];
+    var header = ['Produto','Filial','Un','Qtd','Dias a vencer','Validade','Custo +ICMS','Preço venda','Total custo','Total venda','Markup %','Margem %'];
     var rows = [header.join(';')];
     getFiltered().forEach(function(it){
       var totalCusto = (it.q||0)*(it.c||0);

@@ -140,6 +140,11 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
 .theme-toggle{display:flex;gap:6px;}
 .theme-toggle button{padding:6px 12px;font-size:12.5px;}
 .theme-toggle button.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px;}
+.modal-overlay.collapsed{display:none;}
+.modal-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;max-width:420px;width:100%;}
+.modal-box p{margin:0 0 12px;font-size:13.5px;line-height:1.5;color:var(--text);}
+.modal-box textarea{margin-bottom:12px;}
 </style>
 </head>
 <body>
@@ -319,10 +324,90 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   </p>
 </div>
 
+<div class="modal-overlay collapsed" id="modalOverlay">
+  <div class="modal-box">
+    <p id="modalMessage"></p>
+    <textarea id="modalInput" style="display:none" rows="6"></textarea>
+    <div class="actions">
+      <button class="primary" id="modalConfirmBtn">OK</button>
+      <button id="modalCancelBtn">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
   var STORAGE_KEY = 'fefo_tracker_v1';
   var THEME_KEY = 'fefo_theme_v1';
+
+  /* Substitui confirm()/prompt()/alert() nativos: dentro do visualizador de
+     artefatos do Claude esses dialogs do navegador ficam bloqueados
+     (confirm() sempre retorna false, prompt() sempre retorna null), entao
+     qualquer acao que dependesse deles (Limpar tudo, Substituir tudo,
+     Restaurar backup) parecia nao fazer nada. Esse modal roda dentro da
+     propria pagina e funciona em qualquer lugar. */
+  function closeModal(){
+    document.getElementById('modalOverlay').classList.add('collapsed');
+  }
+  function showConfirm(message, onYes){
+    var overlay = document.getElementById('modalOverlay');
+    document.getElementById('modalMessage').textContent = message;
+    var input = document.getElementById('modalInput');
+    input.style.display = 'none';
+    var confirmBtn = document.getElementById('modalConfirmBtn');
+    var cancelBtn = document.getElementById('modalCancelBtn');
+    confirmBtn.textContent = 'Confirmar';
+    cancelBtn.style.display = '';
+    overlay.classList.remove('collapsed');
+    function onConfirmClick(){ cleanup(); onYes(); }
+    function onCancelClick(){ cleanup(); }
+    function cleanup(){
+      closeModal();
+      confirmBtn.removeEventListener('click', onConfirmClick);
+      cancelBtn.removeEventListener('click', onCancelClick);
+    }
+    confirmBtn.addEventListener('click', onConfirmClick);
+    cancelBtn.addEventListener('click', onCancelClick);
+  }
+  function showPrompt(message, onSubmit){
+    var overlay = document.getElementById('modalOverlay');
+    document.getElementById('modalMessage').textContent = message;
+    var input = document.getElementById('modalInput');
+    input.style.display = '';
+    input.value = '';
+    var confirmBtn = document.getElementById('modalConfirmBtn');
+    var cancelBtn = document.getElementById('modalCancelBtn');
+    confirmBtn.textContent = 'OK';
+    cancelBtn.style.display = '';
+    overlay.classList.remove('collapsed');
+    input.focus();
+    function onConfirmClick(){ var v = input.value; cleanup(); onSubmit(v); }
+    function onCancelClick(){ cleanup(); }
+    function cleanup(){
+      closeModal();
+      confirmBtn.removeEventListener('click', onConfirmClick);
+      cancelBtn.removeEventListener('click', onCancelClick);
+    }
+    confirmBtn.addEventListener('click', onConfirmClick);
+    cancelBtn.addEventListener('click', onCancelClick);
+  }
+  function showToast(message){
+    var overlay = document.getElementById('modalOverlay');
+    document.getElementById('modalMessage').textContent = message;
+    var input = document.getElementById('modalInput');
+    input.style.display = 'none';
+    var confirmBtn = document.getElementById('modalConfirmBtn');
+    var cancelBtn = document.getElementById('modalCancelBtn');
+    confirmBtn.textContent = 'OK';
+    cancelBtn.style.display = 'none';
+    overlay.classList.remove('collapsed');
+    function onOk(){ cleanup(); }
+    function cleanup(){
+      closeModal();
+      confirmBtn.removeEventListener('click', onOk);
+    }
+    confirmBtn.addEventListener('click', onOk);
+  }
 
   function applyTheme(theme){
     if(theme === 'boibom') document.documentElement.setAttribute('data-theme', 'boibom');
@@ -835,9 +920,9 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   });
 
   document.getElementById('btnClear').addEventListener('click', function(){
-    if(confirm('Remover todos os itens da planilha? Esta acao nao pode ser desfeita.')){
+    showConfirm('Remover todos os itens da planilha? Esta acao nao pode ser desfeita.', function(){
       items = []; saveItems(); render();
-    }
+    });
   });
 
   document.getElementById('btnPaste').addEventListener('click', function(){
@@ -874,7 +959,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     document.getElementById('pasteArea').value = '';
     document.getElementById('pastePanel').classList.add('collapsed');
     saveItems(); render();
-    alert(added + ' item(ns) adicionado(s).');
+    showToast(added + ' item(ns) adicionado(s).');
   });
 
   async function getDownloads(){
@@ -921,21 +1006,22 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   });
 
   document.getElementById('btnRestore').addEventListener('click', function(){
-    var json = prompt('Cole aqui o conteudo do arquivo de backup (JSON):');
-    if(!json) return;
-    try{
-      var parsed = JSON.parse(json);
-      if(!Array.isArray(parsed)) throw new Error('formato invalido');
-      items = parsed.map(function(it, idx){
-        var merged = Object.assign({_id: idx + '-' + Math.random().toString(36).slice(2,8)}, it);
-        if(!merged.st) merged.st = 'normal';
-        return merged;
-      });
-      saveItems(); render();
-      alert('Backup restaurado: ' + items.length + ' itens.');
-    }catch(e){
-      alert('Nao foi possivel ler esse backup. Confira se colou o JSON completo.');
-    }
+    showPrompt('Cole aqui o conteudo do arquivo de backup (JSON):', function(json){
+      if(!json) return;
+      try{
+        var parsed = JSON.parse(json);
+        if(!Array.isArray(parsed)) throw new Error('formato invalido');
+        items = parsed.map(function(it, idx){
+          var merged = Object.assign({_id: idx + '-' + Math.random().toString(36).slice(2,8)}, it);
+          if(!merged.st) merged.st = 'normal';
+          return merged;
+        });
+        saveItems(); render();
+        showToast('Backup restaurado: ' + items.length + ' itens.');
+      }catch(e){
+        showToast('Nao foi possivel ler esse backup. Confira se colou o JSON completo.');
+      }
+    });
   });
 
   /* ---------------- IMPORT: 1707 + 8211 cross-reference ---------------- */
@@ -1281,9 +1367,9 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     commitPreview(false);
   });
   document.getElementById('btnPreviewReplace').addEventListener('click', function(){
-    if(confirm('Isso vai substituir todos os itens atuais pelos itens importados. Continuar?')){
+    showConfirm('Isso vai substituir todos os itens atuais pelos itens importados. Continuar?', function(){
       commitPreview(true);
-    }
+    });
   });
   function commitPreview(replace){
     var toAdd = previewItems.map(function(it){

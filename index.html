@@ -159,7 +159,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   <div id="filialSummary"></div>
 
   <div class="toolbar">
-    <button class="primary" id="btnToggleImport">Importar arquivos (8080 + 8211)</button>
+    <button class="primary" id="btnToggleImport">Importar arquivos (1707 + 8211)</button>
     <button id="btnAdd">+ Novo item</button>
     <button id="btnPaste">Colar dados</button>
     <button id="btnExportCsv">Exportar CSV</button>
@@ -169,14 +169,14 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   </div>
 
   <div class="panel collapsed" id="importPanel">
-    <h2 class="section-title">Importar rotina 8080 ou 1707 (validade) + rotina 8211 (custo/venda)</h2>
+    <h2 class="section-title">Importar rotina 1707 (validade) + rotina 8211 (custo/venda)</h2>
     <p class="hint">
-      Envie os arquivos Excel exportados da rotina de validade (8080 ou 1707) e da rotina 8211. O formato do
-      arquivo de validade e detectado automaticamente. O cruzamento e feito pelo codigo do produto: cada item
-      e localizado nos arquivos do 8211 pra puxar automaticamente o custo (+ICMS) e o preco de venda. A
-      rotina 1707 nao traz a unidade (KG/UN) nem a filial por coluna - a unidade entra como KG por padrao
-      (ajustavel depois na tabela) e a filial e a que voce marcar em cada arquivo do 8211, ja que o export da
-      1707 e feito filtrando uma filial por vez.
+      Envie os arquivos Excel exportados da rotina 1707 (Consultas Auxiliares - Validade) e da rotina 8211.
+      O cruzamento e feito pelo codigo do produto: cada item e localizado nos arquivos do 8211 pra puxar
+      automaticamente o custo (+ICMS) e o preco de venda. A rotina 1707 traz o status (Normal/Avaria) por
+      linha - isso e lido automaticamente pra cada item. Ela nao traz a unidade (KG/UN) nem a filial por
+      coluna - a unidade entra como KG por padrao (ajustavel depois na tabela) e a filial e a que voce marcar
+      em cada arquivo do 8211, ja que o export da 1707 e feito filtrando uma filial por vez.
     </p>
     <div class="two-col">
       <div>
@@ -196,29 +196,22 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
         </details>
       </div>
       <div>
-        <label class="hint" style="margin:0 0 6px;display:block;font-weight:600;color:var(--text)">Arquivos de validade (rotina 8080 ou 1707)</label>
+        <label class="hint" style="margin:0 0 6px;display:block;font-weight:600;color:var(--text)">Arquivos de validade (rotina 1707)</label>
         <label class="uploadbox">
-          Clique ou arraste arquivo(s) 8080 ou 1707 aqui (.xls/.xlsx)
+          Clique ou arraste arquivo(s) 1707 aqui (.xls/.xlsx)
           <input type="file" id="fileFefo" accept=".xls,.xlsx" multiple>
         </label>
         <div id="listFefo"></div>
         <details>
           <summary>Opcoes avancadas (colunas - deixe em branco pra detectar automatico)</summary>
-          <div class="hint" style="margin:6px 0">Rotina 8080 (produto e descricao juntos numa coluna so):</div>
+          <div class="hint" style="margin:6px 0">Layout padrao da 1707 (colunas contadas a partir de 0 = A):</div>
           <div class="cols-grid">
-            <div><label>Col. produto</label><input type="number" id="colFefoProd" placeholder="auto"></div>
-            <div><label>Col. unidade</label><input type="number" id="colFefoUn" placeholder="auto"></div>
-          </div>
-          <div class="hint" style="margin:10px 0 6px">Rotina 1707 (codigo e descricao em colunas separadas):</div>
-          <div class="cols-grid">
-            <div><label>Col. codigo produto</label><input type="number" id="colFefoCod" placeholder="auto"></div>
-            <div><label>Col. descricao produto</label><input type="number" id="colFefoDesc" placeholder="auto"></div>
-          </div>
-          <div class="hint" style="margin:10px 0 6px">Comuns aos dois formatos:</div>
-          <div class="cols-grid">
-            <div><label>Col. quantidade</label><input type="number" id="colFefoQtd" placeholder="auto"></div>
-            <div><label>Col. dias a vencer</label><input type="number" id="colFefoDias" placeholder="auto"></div>
-            <div><label>Col. validade</label><input type="number" id="colFefoValid" placeholder="auto"></div>
+            <div><label>Col. codigo produto</label><input type="number" id="colFefoCod" placeholder="auto (A)"></div>
+            <div><label>Col. descricao produto</label><input type="number" id="colFefoDesc" placeholder="auto (B)"></div>
+            <div><label>Col. status</label><input type="number" id="colFefoStatus" placeholder="auto (H)"></div>
+            <div><label>Col. validade (data)</label><input type="number" id="colFefoValid" placeholder="auto (J)"></div>
+            <div><label>Col. dias a vencer</label><input type="number" id="colFefoDias" placeholder="auto (K)"></div>
+            <div><label>Col. quantidade (disponivel)</label><input type="number" id="colFefoQtd" placeholder="auto (Q)"></div>
           </div>
         </details>
       </div>
@@ -834,7 +827,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     }
   });
 
-  /* ---------------- IMPORT: 8080 + 8211 cross-reference ---------------- */
+  /* ---------------- IMPORT: 1707 + 8211 cross-reference ---------------- */
 
   document.getElementById('btnToggleImport').addEventListener('click', function(){
     document.getElementById('importPanel').classList.toggle('collapsed');
@@ -909,50 +902,12 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   }
   function pad2(n){ return (n < 10 ? '0' : '') + n; }
 
-  /* Nas rotinas 8080/1707, o relatorio agrupa os itens sob linhas-titulo tipo
-     "PRODUTO NORMAL" ou "AVARIA". Essas linhas tem poucas celulas preenchidas
-     (so o rotulo). Detecta esse marcador pra taguear os itens seguintes ate
-     o proximo marcador. */
-  function detectStatusMarker(row){
-    if(!row) return null;
-    var filled = 0, text = '';
-    for(var i=0; i<row.length; i++){
-      var c = row[i];
-      if(c !== null && c !== undefined && String(c).trim() !== ''){
-        filled++;
-        text += ' ' + String(c).trim().toUpperCase();
-      }
-    }
-    if(filled === 0 || filled > 3) return null;
-    if(text.indexOf('AVARIA') > -1) return 'avaria';
-    if(text.indexOf('NORMAL') > -1) return 'normal';
-    return null;
-  }
+  /* Rotina 1707 (Consultas Auxiliares - Validade). Layout observado (colunas
+     contadas a partir de 0 = A): col0=codigo, col1=descricao, col7=status
+     (Normal/Avaria), col9=data validade (Dt. Ven.), col10=(Dias) Vencimento,
+     col16=Disponivel (quantidade). Sem coluna de unidade. */
+  var COL_1707_DEFAULT = {cod:0, desc:1, status:7, valid:9, dias:10, qtd:16};
 
-  function detectFefoColumns(rows){
-    var headerRowIdx = -1, map = {};
-    for(var i=0; i<Math.min(rows.length, 15); i++){
-      var row = rows[i] || [];
-      var joined = row.map(function(c){ return c === null ? '' : String(c); }).join(' | ').toLowerCase();
-      if(joined.indexOf('produto') > -1){
-        headerRowIdx = i;
-        row.forEach(function(cell, ci){
-          var t = (cell === null ? '' : String(cell)).toLowerCase();
-          if(/produto/.test(t)) map.prod = ci;
-          else if(/geral|^wms$|quantidade/.test(t)) { if(map.qtd === undefined) map.qtd = ci; }
-          else if(/^un\.?$|unidade/.test(t)) map.un = ci;
-          else if(/dias/.test(t)) map.dias = ci;
-          else if(/valid/.test(t)) map.valid = ci;
-        });
-        break;
-      }
-    }
-    return {headerRowIdx: headerRowIdx, map: map};
-  }
-
-  /* Rotina 1707 (Consultas Auxiliares - Validade): sem cabecalho, codigo e
-     descricao em colunas separadas. Layout observado: col0=codigo, col1=descricao,
-     col9=data validade, col10=dias a vencer, col13=quantidade. Sem coluna de unidade. */
   function looksLike1707(rows){
     for(var i=0; i<Math.min(rows.length, 5); i++){
       var row = rows[i];
@@ -963,52 +918,28 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     return false;
   }
 
-  /* Rotina 8080 exportada sem linha de cabecalho: col0=rua, col1=produto
-     (codigo - descricao), col2=qtd estoque geral, col3=bloqueado, col4=un,
-     col5=qtd caixa, col6=dias a vencer, col7=validade. */
-  function looksLike8080NoHeader(rows){
-    for(var i=0; i<Math.min(rows.length, 5); i++){
-      var row = rows[i];
-      if(row && typeof row[1] === 'string' && row[1].indexOf(' - ') > -1 && row.length >= 7 && row.length < 14){
-        return true;
-      }
-    }
-    return false;
-  }
-
   function overrideOrDetect(rows){
     var manualCod = numOrUndef('colFefoCod');
     var manualDesc = numOrUndef('colFefoDesc');
-    var manualProd = numOrUndef('colFefoProd');
+    var manualStatus = numOrUndef('colFefoStatus');
     var manualQtd = numOrUndef('colFefoQtd');
-    var manualUn = numOrUndef('colFefoUn');
     var manualDias = numOrUndef('colFefoDias');
     var manualValid = numOrUndef('colFefoValid');
+    var hasManual = manualCod !== undefined || manualDesc !== undefined || manualStatus !== undefined ||
+      manualQtd !== undefined || manualDias !== undefined || manualValid !== undefined;
 
-    if(manualCod !== undefined || manualDesc !== undefined){
+    if(hasManual){
       return {style:'1707', headerRowIdx:-1, map:{
-        cod: manualCod !== undefined ? manualCod : 0,
-        desc: manualDesc !== undefined ? manualDesc : 1,
-        qtd: manualQtd !== undefined ? manualQtd : 13,
-        dias: manualDias !== undefined ? manualDias : 10,
-        valid: manualValid !== undefined ? manualValid : 9
+        cod: manualCod !== undefined ? manualCod : COL_1707_DEFAULT.cod,
+        desc: manualDesc !== undefined ? manualDesc : COL_1707_DEFAULT.desc,
+        status: manualStatus !== undefined ? manualStatus : COL_1707_DEFAULT.status,
+        valid: manualValid !== undefined ? manualValid : COL_1707_DEFAULT.valid,
+        dias: manualDias !== undefined ? manualDias : COL_1707_DEFAULT.dias,
+        qtd: manualQtd !== undefined ? manualQtd : COL_1707_DEFAULT.qtd
       }};
-    }
-    if(manualProd !== undefined){
-      return {style:'8080', headerRowIdx:0, map:{
-        prod: manualProd, qtd: manualQtd, un: manualUn, dias: manualDias, valid: manualValid
-      }};
-    }
-
-    var det = detectFefoColumns(rows);
-    if(det.headerRowIdx >= 0 && det.map.prod !== undefined && det.map.qtd !== undefined){
-      return {style:'8080', headerRowIdx: det.headerRowIdx, map: det.map};
-    }
-    if(looksLike8080NoHeader(rows)){
-      return {style:'8080', headerRowIdx:-1, map:{prod:1, qtd:2, un:4, dias:6, valid:7}};
     }
     if(looksLike1707(rows)){
-      return {style:'1707', headerRowIdx:-1, map:{cod:0, desc:1, qtd:13, dias:10, valid:9}};
+      return {style:'1707', headerRowIdx:-1, map: COL_1707_DEFAULT};
     }
     return {style:'unknown', headerRowIdx:-1, map:{}};
   }
@@ -1022,7 +953,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     msg.textContent = 'Processando...';
     try{
       if(custoFiles.length === 0){ msg.textContent = 'Envie ao menos um arquivo 8211 (custo/venda).'; return; }
-      if(fefoFiles.length === 0){ msg.textContent = 'Envie ao menos um arquivo 8080 (validade).'; return; }
+      if(fefoFiles.length === 0){ msg.textContent = 'Envie ao menos um arquivo 1707 (validade).'; return; }
 
       var prodCol = parseInt(document.getElementById('colCustoProd').value, 10);
       var custoCol = parseInt(document.getElementById('colCustoValor').value, 10);
@@ -1056,30 +987,23 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
           return;
         }
         var startRow = cfg.headerRowIdx >= 0 ? cfg.headerRowIdx + 1 : 0;
-        var currentStatus = 'normal';
         for(var r=startRow; r<frows.length; r++){
           var row = frows[r];
           if(!row) continue;
-          var marker = detectStatusMarker(row);
-          if(marker){ currentStatus = marker; continue; }
-          var prodStr, code, un;
-          if(cfg.style === '1707'){
-            if(row[cfg.map.cod] === null || row[cfg.map.cod] === undefined) continue;
-            code = String(row[cfg.map.cod]).trim().replace(/\.0$/, '');
-            var desc = row[cfg.map.desc] === null ? '' : String(row[cfg.map.desc]).trim();
-            prodStr = code + ' - ' + desc;
-            un = 'KG';
-          } else {
-            if(row[cfg.map.prod] === null || row[cfg.map.prod] === undefined) continue;
-            prodStr = String(row[cfg.map.prod]).trim();
-            if(prodStr.indexOf(' - ') === -1) continue;
-            code = prodStr.split(' - ')[0].trim();
-            un = cfg.map.un !== undefined ? String(row[cfg.map.un] || 'KG').trim().toUpperCase() : 'KG';
-          }
+          if(row[cfg.map.cod] === null || row[cfg.map.cod] === undefined) continue;
+          var code = String(row[cfg.map.cod]).trim().replace(/\.0$/, '');
+          if(code === '') continue;
+          var desc = row[cfg.map.desc] === null ? '' : String(row[cfg.map.desc]).trim();
+          var prodStr = code + ' - ' + desc;
+          var un = 'KG';
+
           var qtd = parseNum(row[cfg.map.qtd]);
           if(qtd === null) continue;
           var dias = cfg.map.dias !== undefined ? parseNum(row[cfg.map.dias]) : null;
           var valid = cfg.map.valid !== undefined ? excelDateToStr(row[cfg.map.valid]) : '';
+          var statusRaw = (cfg.map.status !== undefined && row[cfg.map.status] !== null && row[cfg.map.status] !== undefined)
+            ? String(row[cfg.map.status]).trim().toUpperCase() : '';
+          var itemStatus = statusRaw.indexOf('AVARIA') > -1 ? 'avaria' : 'normal';
 
           var matches = costIndex[code] || [];
           var status = 'bad', filial = fileFilial, custo = null, venda = null, note = 'Nao encontrado no 8211';
@@ -1097,7 +1021,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
             status = 'warn'; filial = matches[0].filial; custo = matches[0].custo; venda = matches[0].venda;
             note = 'Codigo em ' + matches.length + ' filiais - confira';
           }
-          previewItems.push({p: prodStr, f: filial, u: un, q: qtd, d: dias, v: valid, c: custo, s: venda, st: currentStatus, status: status, note: note});
+          previewItems.push({p: prodStr, f: filial, u: un, q: qtd, d: dias, v: valid, c: custo, s: venda, st: itemStatus, status: status, note: note});
         }
       }
 

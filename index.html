@@ -149,6 +149,21 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
 .modal-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;max-width:420px;width:100%;}
 .modal-box p{margin:0 0 12px;font-size:13.5px;line-height:1.5;color:var(--text);}
 .modal-box textarea{margin-bottom:12px;}
+.print-only{display:none;}
+.print-table{width:100%;border-collapse:collapse;font-size:11px;}
+.print-table th, .print-table td{border:1px solid #999;padding:3px 6px;text-align:left;}
+.print-table th{background:#eee;}
+.print-table td.num{text-align:right;font-variant-numeric:tabular-nums;}
+@media print{
+  @page{ size: landscape; margin: 12mm; }
+  body{ background:#fff; }
+  .toolbar, .legend, .legend-hint, #autoLoadBanner, #syncBanner, .theme-toggle, .foot-note,
+  #importPanel, #previewPanel, #pastePanel, .modal-overlay, .tablewrap{
+    display:none !important;
+  }
+  .print-only{ display:block !important; }
+  * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+}
 </style>
 </head>
 <body>
@@ -166,6 +181,9 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     </div>
   </div>
 
+  <div class="print-only" id="printHeader"></div>
+  <div class="print-only" id="printTableWrap"></div>
+
   <div class="cards" id="cards"></div>
   <div id="filialSummary"></div>
 
@@ -174,6 +192,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     <button id="btnAutoReload">Atualizar do repositorio</button>
     <button id="btnAdd">+ Novo item</button>
     <button id="btnPaste">Colar dados</button>
+    <button id="btnPrint">Imprimir relatorio</button>
     <button id="btnExportCsv">Exportar CSV</button>
     <button id="btnBackup">Backup (JSON)</button>
     <button id="btnRestore">Restaurar backup</button>
@@ -1042,6 +1061,102 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     document.getElementById('pastePanel').classList.add('collapsed');
     saveItems(); render();
     showToast(added + ' item(ns) adicionado(s).');
+  });
+
+  function buildPrintHeader(){
+    var el = document.getElementById('printHeader');
+    if(!el) return;
+    el.innerHTML = '';
+    var filFilial = document.getElementById('filFilial');
+    var filStatus = document.getElementById('filStatus');
+    var filEstoque = document.getElementById('filEstoque');
+    var busca = document.getElementById('filBusca').value.trim();
+    var filialLabel = filFilial.options[filFilial.selectedIndex].textContent;
+    var statusLabel = filStatus.options[filStatus.selectedIndex].textContent;
+    var estoqueLabel = filEstoque.options[filEstoque.selectedIndex].textContent;
+    var bandLabels = BAND_DEFS.filter(function(b){ return activeBands.has(b.key); }).map(function(b){ return b.label; });
+    var bandsText = bandLabels.length === BAND_DEFS.length ? 'Todas as faixas' :
+      (bandLabels.length ? bandLabels.join(', ') : 'Nenhuma faixa selecionada');
+    var now = new Date();
+    var dataHora = pad2(now.getDate())+'/'+pad2(now.getMonth()+1)+'/'+now.getFullYear()+' '+pad2(now.getHours())+':'+pad2(now.getMinutes());
+    var count = getFiltered().length;
+
+    var h = document.createElement('h1'); h.style.margin = '0 0 4px'; h.textContent = 'Relatorio Controle FEFO';
+    var pMeta = document.createElement('p'); pMeta.style.cssText = 'margin:0 0 10px;color:#333';
+    pMeta.textContent = 'Gerado em ' + dataHora + ' - ' + count + ' item(ns)';
+    var pFiltros = document.createElement('p'); pFiltros.style.cssText = 'margin:0 0 14px;color:#333';
+    var filtroTxt = 'Filial: ' + filialLabel + ' | Status: ' + statusLabel + ' | Estoque: ' + estoqueLabel +
+      (busca ? ' | Busca: "' + busca + '"' : '') + ' | Faixas: ' + bandsText;
+    pFiltros.textContent = filtroTxt;
+
+    el.appendChild(h); el.appendChild(pMeta); el.appendChild(pFiltros);
+  }
+
+  /* Tabela dedicada pra impressao: so texto (sem inputs/selects, que nao
+     imprimem de forma confiavel entre navegadores), com o produto por
+     extenso e os mesmos calculos do render() principal. */
+  function buildPrintTable(){
+    var wrap = document.getElementById('printTableWrap');
+    if(!wrap) return;
+    wrap.innerHTML = '';
+    var list = getFiltered();
+    var table = document.createElement('table'); table.className = 'print-table';
+    var thead = document.createElement('thead'); var trh = document.createElement('tr');
+    ['Produto','Filial','Un.','Disponivel','Bloqueado','Pendente','Dias a vencer','Validade',
+     'Custo +ICMS (R$)','Preço venda (R$)','Total custo (R$)','Total venda (R$)','Markup %','Margem %'
+    ].forEach(function(txt){ var th = document.createElement('th'); th.textContent = txt; trh.appendChild(th); });
+    thead.appendChild(trh); table.appendChild(thead);
+
+    var tbody = document.createElement('tbody');
+    var sumCusto = 0, sumVenda = 0, hasVenda = false;
+    list.forEach(function(it){
+      var tr = document.createElement('tr'); tr.className = 'band-' + bandKey(it.d);
+      function td(text, num){ var d = document.createElement('td'); if(num) d.className = 'num'; d.textContent = text; return d; }
+      var totalCusto = (it.q || 0) * (it.c || 0);
+      var totalVenda = (it.s !== null && it.s !== undefined) ? (it.q || 0) * it.s : null;
+      var temPreco = (it.s !== null && it.s !== undefined && it.c);
+      var markup = temPreco ? ((it.s - it.c) / it.c * 100) : null;
+      var margem = (temPreco && it.s) ? ((it.s - it.c) / it.s * 100) : null;
+      sumCusto += totalCusto;
+      if(totalVenda !== null){ sumVenda += totalVenda; hasVenda = true; }
+
+      tr.appendChild(td(it.p));
+      tr.appendChild(td(it.f ? 'Filial ' + it.f : '-'));
+      tr.appendChild(td(it.u || '-'));
+      tr.appendChild(td(it.q === null || it.q === undefined ? '-' : it.q, true));
+      tr.appendChild(td(it.bloq ? it.bloq : '-', true));
+      tr.appendChild(td(it.pend ? it.pend : '-', true));
+      tr.appendChild(td(it.d === null || it.d === undefined ? '-' : it.d, true));
+      tr.appendChild(td(it.v || '-'));
+      tr.appendChild(td(it.c === null || it.c === undefined ? '-' : it.c, true));
+      tr.appendChild(td(it.s === null || it.s === undefined ? '-' : it.s, true));
+      tr.appendChild(td(fmtMoney(totalCusto), true));
+      tr.appendChild(td(totalVenda === null ? '-' : fmtMoney(totalVenda), true));
+      tr.appendChild(td(markup === null ? '-' : markup.toFixed(1) + '%', true));
+      tr.appendChild(td(margem === null ? '-' : margem.toFixed(1) + '%', true));
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+
+    var tfoot = document.createElement('tfoot');
+    var trf = document.createElement('tr');
+    var tdLabel = document.createElement('td'); tdLabel.colSpan = 10; tdLabel.style.textAlign = 'right'; tdLabel.style.fontWeight = '600';
+    tdLabel.textContent = 'Totais (itens filtrados):';
+    trf.appendChild(tdLabel);
+    var markupTotal = (hasVenda && sumCusto) ? ((sumVenda - sumCusto) / sumCusto * 100) : null;
+    var margemTotal = (hasVenda && sumVenda) ? ((sumVenda - sumCusto) / sumVenda * 100) : null;
+    [fmtMoney(sumCusto), hasVenda ? fmtMoney(sumVenda) : '-',
+     markupTotal === null ? '-' : markupTotal.toFixed(1) + '%', margemTotal === null ? '-' : margemTotal.toFixed(1) + '%'
+    ].forEach(function(txt){ var d = document.createElement('td'); d.className = 'num'; d.style.fontWeight = '600'; d.textContent = txt; trf.appendChild(d); });
+    tfoot.appendChild(trf); table.appendChild(tfoot);
+
+    wrap.appendChild(table);
+  }
+
+  document.getElementById('btnPrint').addEventListener('click', function(){
+    buildPrintHeader();
+    buildPrintTable();
+    window.print();
   });
 
   async function getDownloads(){

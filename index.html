@@ -73,8 +73,7 @@ button:disabled{opacity:.5;cursor:not-allowed;}
 .chip.active{background:var(--surface-2);color:var(--text);border-color:var(--chip-color, var(--border-strong));font-weight:600;}
 .dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
 .tablewrap{overflow:auto;max-height:calc(100vh - 120px);border:1px solid var(--border);border-radius:10px;background:var(--surface);}
-table{border-collapse:collapse;width:100%;min-width:1540px;font-size:13px;}
-th.col-status, td.status{min-width:92px;}
+table{border-collapse:collapse;width:100%;min-width:1420px;font-size:13px;}
 th{
   background:var(--surface-2);color:var(--text-secondary);font-weight:600;font-size:11.5px;
   text-transform:uppercase;letter-spacing:.02em;text-align:left;padding:9px 8px;border-bottom:1px solid var(--border);
@@ -299,7 +298,6 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
         <tr>
           <th style="width:20%">Produto</th>
           <th>Filial</th>
-          <th class="col-status">Status</th>
           <th>Un.</th>
           <th>Disponivel</th>
           <th>Bloqueado</th>
@@ -318,7 +316,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       <tbody id="tbody"></tbody>
       <tfoot>
         <tr>
-          <td colspan="11" style="text-align:right">Totais (itens filtrados):</td>
+          <td colspan="10" style="text-align:right">Totais (itens filtrados):</td>
           <td class="readonly" id="footCusto">-</td>
           <td class="readonly" id="footVenda">-</td>
           <td class="readonly" id="footMarkup">-</td>
@@ -826,7 +824,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     if(list.length === 0){
       var tr = document.createElement('tr');
       var td = document.createElement('td');
-      td.colSpan = 16; td.className = 'empty';
+      td.colSpan = 15; td.className = 'empty';
       td.textContent = 'Nenhum item nessa selecao. Ajuste os filtros de dias a vencer, filial, status ou busca.';
       tr.appendChild(td); tbody.appendChild(tr);
     }
@@ -838,7 +836,6 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
 
       tr.appendChild(produtoCell(it));
       tr.appendChild(cellSelect(it, 'f', [['1','Filial 1'],['3','Filial 3']]));
-      tr.appendChild(cellSelect(it, 'st', [['normal','Normal'],['avaria','Avaria']]));
       var tdUn = document.createElement('td'); tdUn.className = 'readonly'; tdUn.style.textAlign = 'center'; tdUn.textContent = it.u || '-';
       tr.appendChild(tdUn);
       tr.appendChild(cellInput('num', it, 'q', 'number'));

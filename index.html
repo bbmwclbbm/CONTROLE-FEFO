@@ -746,7 +746,10 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     if(v === 'bloqueado') return it.bloq > 0;
     if(v === 'pendente') return it.pend > 0;
     if(v === 'ambos') return (it.bloq > 0) || (it.pend > 0);
-    if(v === 'disponivel') return !(it.bloq > 0) && !(it.pend > 0);
+    /* "Disponivel" usa a quantidade da propria 1707 (por localizacao/linha),
+       nao o bloqueado/pendente do 8211 (que e agregado por produto+filial e
+       faz um item sumir inteiro so por ter algo bloqueado em outro endereco). */
+    if(v === 'disponivel') return (it.q || 0) > 0;
     return true;
   }
 

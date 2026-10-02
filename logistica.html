@@ -103,11 +103,29 @@ td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
 .theme-toggle{display:flex;gap:6px;}
 .theme-toggle button{padding:6px 12px;font-size:12.5px;}
 .theme-toggle button.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;}
+.panel.collapsed{display:none;}
+.panel h2{font-size:14px;margin:0 0 10px;}
+.hint{font-size:12px;color:var(--text-secondary);margin:6px 0 10px;line-height:1.5;}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media (max-width:760px){.two-col{grid-template-columns:1fr;}}
+.uploadbox{border:1.5px dashed var(--border-strong);border-radius:10px;padding:16px;text-align:center;font-size:13px;color:var(--text-secondary);cursor:pointer;}
+.uploadbox:hover{background:var(--surface-2);}
+.uploadbox input{display:none;}
+.filerow{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.filerow:last-child{border-bottom:none;}
+.filerow .fname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
 .print-only{display:none;}
 .print-table{width:100%;border-collapse:collapse;font-size:11px;}
-.print-table th, .print-table td{border:1px solid #999;padding:3px 6px;text-align:left;}
-.print-table th{background:#eee;}
+.print-table th, .print-table td{border:1px solid var(--border-strong);padding:3px 6px;text-align:left;color:var(--text);}
+.print-table th{background:var(--surface-2);font-weight:600;}
 .print-table td.num{text-align:right;font-variant-numeric:tabular-nums;}
+.print-table tr.band-vencido, .print-table tr.band-b0{background:var(--band-critico);}
+.print-table tr.band-b1{background:var(--band-b1);}
+.print-table tr.band-b2{background:var(--band-b2);}
+.print-table tr.band-b3{background:var(--band-b3);}
+.print-table tr.band-b4{background:var(--band-b4);}
 @media print{
   @page{ size: landscape; margin: 12mm; }
   body{ background:#fff; }
@@ -126,6 +144,7 @@ td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
       <h1>Controle FEFO - Logistica</h1>
       <p class="subtitle">Preco tabela e disponibilidade por item. Ordenado por dias a vencer.</p>
       <p class="hint" id="autoLoadBanner" style="margin:2px 0 0"></p>
+      <p class="hint" id="manualImportBanner" style="margin:2px 0 0"></p>
     </div>
     <div class="theme-toggle" id="themeToggle">
       <button type="button" data-theme-opt="light">Claro</button>
@@ -139,9 +158,43 @@ td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
   <div class="cards" id="cards"></div>
 
   <div class="toolbar">
-    <button class="primary" id="btnAutoReload">Atualizar do repositorio</button>
-    <button id="btnPrint">Imprimir relatorio</button>
+    <button class="primary" id="btnToggleImport">Importar 1707 (Filial 1 e 3)</button>
+    <button id="btnAutoReload">Atualizar do repositorio</button>
+    <button id="btnPrint">Exportar PDF</button>
     <button id="btnExportCsv">Exportar CSV</button>
+  </div>
+
+  <div class="panel collapsed" id="importPanel">
+    <h2>Importar rotina 1707 (quantidade, dias a vencer, validade e status)</h2>
+    <p class="hint">
+      Envie aqui os arquivos da rotina 1707 de cada filial. Isso atualiza quantidade disponivel, dias a vencer,
+      validade e status (normal/avaria) na tabela abaixo. O preco de tabela nao muda por aqui - ele continua
+      sendo o da ultima atualizacao feita pelo Wesley. Essa atualizacao fica so neste navegador, nesta visita -
+      ao recarregar a pagina ela volta a mostrar os dados do repositorio.
+    </p>
+    <div class="two-col">
+      <div>
+        <label class="hint" style="margin:0 0 6px;display:block;font-weight:600;color:var(--text)">1707 - Filial 1</label>
+        <label class="uploadbox">
+          Clique ou arraste o arquivo da Filial 1 aqui (.xls/.xlsx)
+          <input type="file" id="fileFefo1" accept=".xls,.xlsx">
+        </label>
+        <div id="listFefo1"></div>
+      </div>
+      <div>
+        <label class="hint" style="margin:0 0 6px;display:block;font-weight:600;color:var(--text)">1707 - Filial 3</label>
+        <label class="uploadbox">
+          Clique ou arraste o arquivo da Filial 3 aqui (.xls/.xlsx)
+          <input type="file" id="fileFefo3" accept=".xls,.xlsx">
+        </label>
+        <div id="listFefo3"></div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="btnProcessarManual">Atualizar tabela</button>
+      <button id="btnImportCancel">Cancelar</button>
+    </div>
+    <div id="importMsg" class="hint"></div>
   </div>
 
   <p class="legend-hint">Clique numa ou mais faixas pra filtrar a tabela por dias a vencer:</p>
@@ -446,7 +499,7 @@ td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
     var list = getFiltered();
     var table = document.createElement('table'); table.className = 'print-table';
     var thead = document.createElement('thead'); var trh = document.createElement('tr');
-    ['Produto','Filial','Un.','Disponivel','Bloqueado','Pendente','Dias a vencer','Validade','Preco tabela (R$)']
+    ['Produto','Filial','Un.','Disponivel','Bloqueado','Pendente','Dias a vencer','Validade']
       .forEach(function(txt){ var th = document.createElement('th'); th.textContent = txt; trh.appendChild(th); });
     thead.appendChild(trh); table.appendChild(thead);
 
@@ -462,7 +515,6 @@ td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
       tr.appendChild(td(it.pend ? it.pend : '-', true));
       tr.appendChild(td(it.d === null || it.d === undefined ? '-' : it.d, true));
       tr.appendChild(td(it.v || '-'));
-      tr.appendChild(td(it.s === null || it.s === undefined ? '-' : fmtMoney(it.s), true));
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
@@ -501,6 +553,26 @@ td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
     return false;
   }
 
+  /* Le uma linha da rotina 1707 e devolve os campos de validade/estoque -
+     usado tanto no cruzamento automatico (crossReference) quanto na
+     importacao manual feita pela logistica (so atualiza esses campos,
+     nunca o preco). */
+  function parse1707Row(row){
+    if(!row) return null;
+    if(row[COL_1707_DEFAULT.cod] === null || row[COL_1707_DEFAULT.cod] === undefined) return null;
+    var code = String(row[COL_1707_DEFAULT.cod]).trim().replace(/\.0$/, '');
+    if(code === '') return null;
+    var desc = row[COL_1707_DEFAULT.desc] === null ? '' : String(row[COL_1707_DEFAULT.desc]).trim();
+    var qtd = parseNum(row[COL_1707_DEFAULT.qtd]);
+    if(qtd === null) return null;
+    var dias = parseNum(row[COL_1707_DEFAULT.dias]);
+    var valid = excelDateToStr(row[COL_1707_DEFAULT.valid]);
+    var statusRaw = row[COL_1707_DEFAULT.status] !== null && row[COL_1707_DEFAULT.status] !== undefined
+      ? String(row[COL_1707_DEFAULT.status]).trim().toUpperCase() : '';
+    var itemStatus = statusRaw.indexOf('AVARIA') > -1 ? 'avaria' : 'normal';
+    return {code: code, desc: desc, qtd: qtd, dias: dias, valid: valid, status: itemStatus};
+  }
+
   /* Cruza os arquivos 8211 (preco tabela/estoque) com os arquivos 1707
      (validade) ja lidos. Nao exibe nem usa o custo +ICMS - so o preco de
      venda (tabela), bloqueado, pendente e unidade. */
@@ -529,23 +601,11 @@ td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
       var frows = ff.rows;
       if(!looksLike1707(frows)) return;
       for(var r=0; r<frows.length; r++){
-        var row = frows[r];
-        if(!row) continue;
-        if(row[COL_1707_DEFAULT.cod] === null || row[COL_1707_DEFAULT.cod] === undefined) continue;
-        var code = String(row[COL_1707_DEFAULT.cod]).trim().replace(/\.0$/, '');
-        if(code === '') continue;
-        var desc = row[COL_1707_DEFAULT.desc] === null ? '' : String(row[COL_1707_DEFAULT.desc]).trim();
-        var prodStr = code + ' - ' + desc;
+        var parsed = parse1707Row(frows[r]);
+        if(!parsed) continue;
+        var prodStr = parsed.code + ' - ' + parsed.desc;
 
-        var qtd = parseNum(row[COL_1707_DEFAULT.qtd]);
-        if(qtd === null) continue;
-        var dias = parseNum(row[COL_1707_DEFAULT.dias]);
-        var valid = excelDateToStr(row[COL_1707_DEFAULT.valid]);
-        var statusRaw = row[COL_1707_DEFAULT.status] !== null && row[COL_1707_DEFAULT.status] !== undefined
-          ? String(row[COL_1707_DEFAULT.status]).trim().toUpperCase() : '';
-        var itemStatus = statusRaw.indexOf('AVARIA') > -1 ? 'avaria' : 'normal';
-
-        var matches = costIndex[code] || [];
+        var matches = costIndex[parsed.code] || [];
         var filial = fileFilial, venda = null, un = 'KG', bloq = null, pend = null;
         var exact = fileFilial ? matches.filter(function(m){ return m.filial === fileFilial; }) : [];
         var pick = exact.length ? exact[0] : (matches[0] || null);
@@ -554,7 +614,7 @@ td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
           if(pick.un) un = pick.un;
           if(!filial) filial = pick.filial;
         }
-        result.push({p: prodStr, f: filial, u: un, q: qtd, d: dias, v: valid, s: venda, st: itemStatus, bloq: bloq, pend: pend});
+        result.push({p: prodStr, f: filial, u: un, q: parsed.qtd, d: parsed.dias, v: parsed.valid, s: venda, st: parsed.status, bloq: bloq, pend: pend});
       }
     });
     return result;
@@ -624,6 +684,83 @@ td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
 
   document.getElementById('btnAutoReload').addEventListener('click', function(){
     tryAutoImport();
+  });
+
+  /* ---------------- Importacao manual da 1707 (so neste navegador) ----------------
+     A logistica usa isso todo sabado pra atualizar quantidade, dias a vencer,
+     validade e status direto na pagina publica, sem precisar de GitHub nem
+     chave nenhuma. So atualiza esses 4 campos - preco de tabela, unidade,
+     bloqueado e pendente continuam vindo da ultima rotina 8211 carregada
+     (tryAutoImport). Fica so na memoria desta visita: ao recarregar a pagina,
+     ela volta a mostrar os dados do repositorio. */
+  function readFileAsRows(file){
+    return file.arrayBuffer().then(function(buf){
+      var wb = XLSX.read(buf, {type:'array', cellDates:true});
+      var sheet = wb.Sheets[wb.SheetNames[0]];
+      return XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:null});
+    });
+  }
+
+  function mergeManual1707(rows, filial){
+    var updated = 0, added = 0;
+    rows.forEach(function(row){
+      var parsed = parse1707Row(row);
+      if(!parsed) return;
+      var existing = items.find(function(it){
+        var code = it.p.split(' - ')[0].trim();
+        return code === parsed.code && String(it.f) === String(filial);
+      });
+      if(existing){
+        existing.q = parsed.qtd; existing.d = parsed.dias; existing.v = parsed.valid; existing.st = parsed.status;
+        updated++;
+      } else {
+        items.push({p: parsed.code + ' - ' + parsed.desc, f: filial, u: 'KG', q: parsed.qtd, d: parsed.dias,
+          v: parsed.valid, s: null, st: parsed.status, bloq: null, pend: null});
+        added++;
+      }
+    });
+    return {updated: updated, added: added};
+  }
+
+  document.getElementById('btnToggleImport').addEventListener('click', function(){
+    document.getElementById('importPanel').classList.toggle('collapsed');
+  });
+  document.getElementById('btnImportCancel').addEventListener('click', function(){
+    document.getElementById('importPanel').classList.add('collapsed');
+  });
+
+  document.getElementById('btnProcessarManual').addEventListener('click', function(){
+    var f1 = document.getElementById('fileFefo1').files[0];
+    var f3 = document.getElementById('fileFefo3').files[0];
+    var msg = document.getElementById('importMsg');
+    if(!f1 && !f3){
+      msg.textContent = 'Selecione pelo menos um arquivo (Filial 1 ou Filial 3).';
+      return;
+    }
+    msg.textContent = 'Processando...';
+    var jobs = [];
+    if(f1) jobs.push(readFileAsRows(f1).then(function(rows){ return {rows: rows, filial: '1'}; }));
+    if(f3) jobs.push(readFileAsRows(f3).then(function(rows){ return {rows: rows, filial: '3'}; }));
+    Promise.all(jobs).then(function(results){
+      var totalUpdated = 0, totalAdded = 0;
+      results.forEach(function(r){
+        if(!looksLike1707(r.rows)){ return; }
+        var res = mergeManual1707(r.rows, r.filial);
+        totalUpdated += res.updated; totalAdded += res.added;
+      });
+      render();
+      var now = new Date();
+      var banner = document.getElementById('manualImportBanner');
+      banner.textContent = 'Importacao manual as ' + pad2(now.getHours()) + ':' + pad2(now.getMinutes()) +
+        ' - ' + totalUpdated + ' item(ns) atualizado(s), ' + totalAdded + ' novo(s). Preco de tabela nao foi alterado. ' +
+        '(Valido so para esta visita - some ao recarregar a pagina.)';
+      msg.textContent = 'Pronto. Tabela atualizada abaixo.';
+      document.getElementById('fileFefo1').value = '';
+      document.getElementById('fileFefo3').value = '';
+    }).catch(function(e){
+      console.error('Falha ao processar arquivo 1707:', e);
+      msg.textContent = 'Nao foi possivel ler o(s) arquivo(s). Confira se sao .xls/.xlsx validos.';
+    });
   });
 
   render();

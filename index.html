@@ -180,7 +180,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
     <div>
       <h1>Controle FEFO</h1>
-      <p class="subtitle">Custo (+ICMS), preco de venda e margem por item. Ordenado por dias a vencer.</p>
+      <p class="subtitle">Custo (+ICMS), preco de venda e markup por item. Ordenado por dias a vencer.</p>
       <p class="hint" id="syncBanner" style="margin:2px 0 0"></p>
       <p class="hint" id="autoLoadBanner" style="margin:2px 0 0"></p>
     </div>
@@ -337,7 +337,6 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
           <th>Total custo (R$)</th>
           <th>Total venda (R$)</th>
           <th>Markup %</th>
-          <th>Margem %</th>
           <th></th>
         </tr>
       </thead>
@@ -348,7 +347,6 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
           <td class="readonly" id="footCusto">-</td>
           <td class="readonly" id="footVenda">-</td>
           <td class="readonly" id="footMarkup">-</td>
-          <td class="readonly" id="footMargem">-</td>
           <td></td>
         </tr>
       </tfoot>
@@ -826,7 +824,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     var wrap = document.getElementById('filialSummary');
     if(keys.length <= 1){ wrap.innerHTML = ''; return; }
     var html = '<table class="filial-summary"><thead><tr>' +
-      '<th>Filial</th><th class="num">Itens</th><th class="num">Custo total</th><th class="num">Venda total</th><th class="num">Markup medio</th><th class="num">Margem media</th>' +
+      '<th>Filial</th><th class="num">Itens</th><th class="num">Custo total</th><th class="num">Venda total</th><th class="num">Markup medio</th>' +
       '</tr></thead><tbody>';
     var grandItens = 0, grandCusto = 0, grandVenda = 0, grandHasVenda = false;
     keys.forEach(function(k){
@@ -834,16 +832,14 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       grandItens += g.itens; grandCusto += g.custo;
       if(g.hasVenda){ grandVenda += g.venda; grandHasVenda = true; }
       var markup = (g.hasVenda && g.custo) ? ((g.venda - g.custo)/g.custo*100).toFixed(1) + '%' : '-';
-      var margem = (g.hasVenda && g.venda) ? ((g.venda - g.custo)/g.venda*100).toFixed(1) + '%' : '-';
       html += '<tr><td>Filial ' + k + '</td><td class="num">' + g.itens + '</td><td class="num">' +
         fmtMoney(g.custo) + '</td><td class="num">' + (g.hasVenda ? fmtMoney(g.venda) : '-') +
-        '</td><td class="num">' + markup + '</td><td class="num">' + margem + '</td></tr>';
+        '</td><td class="num">' + markup + '</td></tr>';
     });
     var markupTotal = (grandHasVenda && grandCusto) ? ((grandVenda - grandCusto)/grandCusto*100).toFixed(1) + '%' : '-';
-    var margemTotal = (grandHasVenda && grandVenda) ? ((grandVenda - grandCusto)/grandVenda*100).toFixed(1) + '%' : '-';
     html += '<tr class="grand"><td>Total geral</td><td class="num">' + grandItens + '</td><td class="num">' +
       fmtMoney(grandCusto) + '</td><td class="num">' + (grandHasVenda ? fmtMoney(grandVenda) : '-') +
-      '</td><td class="num">' + markupTotal + '</td><td class="num">' + margemTotal + '</td></tr>';
+      '</td><td class="num">' + markupTotal + '</td></tr>';
     html += '</tbody></table>';
     wrap.innerHTML = html;
   }
@@ -855,7 +851,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     if(list.length === 0){
       var tr = document.createElement('tr');
       var td = document.createElement('td');
-      td.colSpan = 15; td.className = 'empty';
+      td.colSpan = 14; td.className = 'empty';
       td.textContent = 'Nenhum item nessa selecao. Ajuste os filtros de dias a vencer, filial, status ou busca.';
       tr.appendChild(td); tbody.appendChild(tr);
     }
@@ -881,7 +877,6 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       var totalVenda = (it.s !== null && it.s !== undefined) ? (it.q || 0) * it.s : null;
       var temPreco = (it.s !== null && it.s !== undefined && it.c);
       var markup = temPreco ? ((it.s - it.c) / it.c * 100) : null;
-      var margem = (temPreco && it.s) ? ((it.s - it.c) / it.s * 100) : null;
 
       sumCusto += totalCusto;
       if(totalVenda !== null){ sumVenda += totalVenda; hasVenda = true; }
@@ -889,8 +884,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       var tdTC = document.createElement('td'); tdTC.className = 'readonly'; tdTC.textContent = fmtMoney(totalCusto);
       var tdTV = document.createElement('td'); tdTV.className = 'readonly'; tdTV.textContent = totalVenda === null ? '-' : fmtMoney(totalVenda);
       var tdMk = document.createElement('td'); tdMk.className = 'readonly'; tdMk.textContent = markup === null ? '-' : markup.toFixed(1) + '%';
-      var tdMg = document.createElement('td'); tdMg.className = 'readonly'; tdMg.textContent = margem === null ? '-' : margem.toFixed(1) + '%';
-      tr.appendChild(tdTC); tr.appendChild(tdTV); tr.appendChild(tdMk); tr.appendChild(tdMg);
+      tr.appendChild(tdTC); tr.appendChild(tdTV); tr.appendChild(tdMk);
 
       var tdRm = document.createElement('td'); tdRm.className = 'rm';
       var btnRm = document.createElement('button'); btnRm.textContent = '✕'; btnRm.title = 'Remover';
@@ -906,9 +900,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     document.getElementById('footCusto').textContent = fmtMoney(sumCusto);
     document.getElementById('footVenda').textContent = hasVenda ? fmtMoney(sumVenda) : '-';
     var markupTotal = (hasVenda && sumCusto) ? ((sumVenda - sumCusto) / sumCusto * 100) : null;
-    var margemTotal = (hasVenda && sumVenda) ? ((sumVenda - sumCusto) / sumVenda * 100) : null;
     document.getElementById('footMarkup').textContent = markupTotal === null ? '-' : markupTotal.toFixed(1) + '%';
-    document.getElementById('footMargem').textContent = margemTotal === null ? '-' : margemTotal.toFixed(1) + '%';
 
     renderLegend();
     renderFilialSummary();
@@ -1115,7 +1107,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     var table = document.createElement('table'); table.className = 'print-table';
     var thead = document.createElement('thead'); var trh = document.createElement('tr');
     ['Produto','Filial','Un.','Disponivel','Bloqueado','Pendente','Dias a vencer','Validade',
-     'Custo +ICMS (R$)','Preço venda (R$)','Total custo (R$)','Total venda (R$)','Markup %','Margem %'
+     'Custo +ICMS (R$)','Preço venda (R$)','Total custo (R$)','Total venda (R$)','Markup %'
     ].forEach(function(txt){ var th = document.createElement('th'); th.textContent = txt; trh.appendChild(th); });
     thead.appendChild(trh); table.appendChild(thead);
 
@@ -1128,7 +1120,6 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       var totalVenda = (it.s !== null && it.s !== undefined) ? (it.q || 0) * it.s : null;
       var temPreco = (it.s !== null && it.s !== undefined && it.c);
       var markup = temPreco ? ((it.s - it.c) / it.c * 100) : null;
-      var margem = (temPreco && it.s) ? ((it.s - it.c) / it.s * 100) : null;
       sumCusto += totalCusto;
       if(totalVenda !== null){ sumVenda += totalVenda; hasVenda = true; }
 
@@ -1145,7 +1136,6 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       tr.appendChild(td(fmtMoney(totalCusto), true));
       tr.appendChild(td(totalVenda === null ? '-' : fmtMoney(totalVenda), true));
       tr.appendChild(td(markup === null ? '-' : markup.toFixed(1) + '%', true));
-      tr.appendChild(td(margem === null ? '-' : margem.toFixed(1) + '%', true));
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
@@ -1156,9 +1146,8 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     tdLabel.textContent = 'Totais (itens filtrados):';
     trf.appendChild(tdLabel);
     var markupTotal = (hasVenda && sumCusto) ? ((sumVenda - sumCusto) / sumCusto * 100) : null;
-    var margemTotal = (hasVenda && sumVenda) ? ((sumVenda - sumCusto) / sumVenda * 100) : null;
     [fmtMoney(sumCusto), hasVenda ? fmtMoney(sumVenda) : '-',
-     markupTotal === null ? '-' : markupTotal.toFixed(1) + '%', margemTotal === null ? '-' : margemTotal.toFixed(1) + '%'
+     markupTotal === null ? '-' : markupTotal.toFixed(1) + '%'
     ].forEach(function(txt){ var d = document.createElement('td'); d.className = 'num'; d.style.fontWeight = '600'; d.textContent = txt; trf.appendChild(d); });
     tfoot.appendChild(trf); table.appendChild(tfoot);
 
@@ -1177,15 +1166,14 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   }
 
   document.getElementById('btnExportCsv').addEventListener('click', async function(){
-    var header = ['Produto','Filial','Un','Qtd','Dias a vencer','Validade','Custo +ICMS','Preço venda','Total custo','Total venda','Markup %','Margem %'];
+    var header = ['Produto','Filial','Un','Qtd','Dias a vencer','Validade','Custo +ICMS','Preço venda','Total custo','Total venda','Markup %'];
     var rows = [header.join(';')];
     getFiltered().forEach(function(it){
       var totalCusto = (it.q||0)*(it.c||0);
       var totalVenda = (it.s !== null && it.s !== undefined) ? (it.q||0)*it.s : '';
       var temPreco = (it.s !== null && it.s !== undefined && it.c);
       var markup = temPreco ? ((it.s-it.c)/it.c*100).toFixed(1) : '';
-      var margem = (temPreco && it.s) ? ((it.s-it.c)/it.s*100).toFixed(1) : '';
-      rows.push([it.p, it.f, it.u, it.q, it.d, it.v, it.c, it.s === null ? '' : it.s, totalCusto.toFixed(2), totalVenda === '' ? '' : totalVenda.toFixed(2), markup, margem].join(';'));
+      rows.push([it.p, it.f, it.u, it.q, it.d, it.v, it.c, it.s === null ? '' : it.s, totalCusto.toFixed(2), totalVenda === '' ? '' : totalVenda.toFixed(2), markup].join(';'));
     });
     var csv = rows.join('\n');
     var downloads = await getDownloads();

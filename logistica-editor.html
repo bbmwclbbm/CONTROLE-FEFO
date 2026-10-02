@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Controle FEFO - Atualizar dados (Logistica)</title>
+<style>
+:root{
+  --bg:#f5f6f4; --surface:#ffffff; --surface-2:#f0f1ee; --text:#1c1e1b; --text-secondary:#5c5f58;
+  --text-muted:#8a8d85; --border:#e0e1dc; --border-strong:#c9cbc3; --accent:#1f4e78; --accent-text:#0c2c45;
+  --accent-bg:#e6eef5; --danger:#a32d2d; --danger-bg:#fcebeb; --ok:#27500a; --ok-bg:#eaf3de;
+  --warn:#854f0b; --warn-bg:#faeeda;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16181a; --surface:#1f2123; --surface-2:#26282a; --text:#eceeec; --text-secondary:#aeb1ab;
+    --text-muted:#82857f; --border:#34363a; --border-strong:#46484c; --accent:#7fb0e0; --accent-text:#d6e8fa;
+    --accent-bg:#0c2c45; --danger:#f7c1c1; --danger-bg:#501313; --ok:#97c459; --ok-bg:#173404;
+    --warn:#fac775; --warn-bg:#412402;
+  }
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;}
+.wrap{max-width:720px;margin:0 auto;padding:24px 16px 60px;}
+h1{font-size:20px;font-weight:600;margin:0 0 2px;}
+.subtitle{color:var(--text-secondary);font-size:13px;margin:0 0 20px;line-height:1.5;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px;}
+.panel h2{font-size:14px;margin:0 0 10px;}
+.panel p.help{font-size:12.5px;color:var(--text-muted);margin:0 0 12px;line-height:1.5;}
+label{display:block;font-size:12.5px;color:var(--text-secondary);margin-bottom:5px;font-weight:600;}
+input[type=password], input[type=text]{
+  width:100%;background:var(--surface-2);color:var(--text);border:1px solid var(--border-strong);
+  border-radius:8px;padding:9px 10px;font-size:13px;margin-bottom:10px;
+}
+input[type=file]{font-size:12.5px;color:var(--text-secondary);margin-bottom:4px;}
+.filerow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);}
+.filerow:last-child{border-bottom:none;}
+.filerow .fname{font-size:12.5px;font-weight:600;}
+.filerow .fstatus{font-size:11.5px;color:var(--text-muted);}
+.filerow .fstatus.ok{color:var(--ok);}
+.filerow .fstatus.err{color:var(--danger);}
+button{
+  background:var(--surface);color:var(--text);border:1px solid var(--border-strong);border-radius:8px;
+  padding:9px 14px;font-size:13px;cursor:pointer;
+}
+button:hover{background:var(--surface-2);}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;width:100%;font-weight:600;margin-top:6px;}
+button.primary:hover{opacity:.9;}
+button.primary:disabled{opacity:.5;cursor:not-allowed;}
+button.linksmall{background:none;border:none;color:var(--accent);padding:0;font-size:12.5px;text-decoration:underline;}
+.toast{
+  position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--text);color:var(--bg);
+  padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:999;max-width:90vw;
+}
+.toast.show{opacity:1;}
+.toast.err{background:var(--danger);color:#fff;}
+.footer-note{font-size:11.5px;color:var(--text-muted);margin-top:18px;line-height:1.5;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Atualizar dados - Controle FEFO Logistica</h1>
+  <p class="subtitle">Pagina de uso restrito para atualizar os arquivos que alimentam o site publico da logistica (preco de tabela, quantidade e dias a vencer). Nao use este link no grupo - ele nao e o site de consulta.</p>
+
+  <div class="panel">
+    <h2>1. Chave de acesso do GitHub</h2>
+    <p class="help">Cole aqui o token de acesso (Personal Access Token) do GitHub, criado uma unica vez. Ele fica salvo somente neste navegador, nunca e enviado para nenhum outro lugar alem do GitHub. Se voce nao tem um token ainda, clique em "Como criar o token".</p>
+    <label for="ghToken">Token do GitHub</label>
+    <input type="password" id="ghToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <button id="btnSaveToken">Salvar chave</button>
+      <button id="btnClearToken">Apagar chave salva</button>
+      <button class="linksmall" id="btnHowTo">Como criar o token</button>
+    </div>
+    <div id="howToBox" style="display:none;margin-top:12px;font-size:12.5px;color:var(--text-secondary);line-height:1.6;background:var(--surface-2);border-radius:8px;padding:12px;">
+      1. Acesse <b>github.com/settings/tokens?type=beta</b> e clique em "Generate new token".<br>
+      2. De um nome (ex: "Logistica FEFO") e em "Repository access" escolha "Only select repositories" &rarr; CONTROLE-FEFO.<br>
+      3. Em "Permissions", abra "Contents" e marque "Read and write".<br>
+      4. Gere o token e cole aqui. Guarde-o em local seguro - ele nao aparece de novo depois de fechar aquela tela do GitHub.
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>2. Selecionar os 4 arquivos</h2>
+    <p class="help">Selecione os relatorios exportados do WMS. Os nomes dos arquivos nao importam - o que importa e qual campo voce usa para cada um.</p>
+    <div class="filerow">
+      <div><div class="fname">1707 - Filial 1</div><input type="file" data-target="1707 f1.xls" accept=".xls,.xlsx"></div>
+      <div class="fstatus" data-status="1707 f1.xls">pendente</div>
+    </div>
+    <div class="filerow">
+      <div><div class="fname">1707 - Filial 3</div><input type="file" data-target="1707 f3.xls" accept=".xls,.xlsx"></div>
+      <div class="fstatus" data-status="1707 f3.xls">pendente</div>
+    </div>
+    <div class="filerow">
+      <div><div class="fname">8211 - Filial 1</div><input type="file" data-target="8211 f1.xls" accept=".xls,.xlsx"></div>
+      <div class="fstatus" data-status="8211 f1.xls">pendente</div>
+    </div>
+    <div class="filerow">
+      <div><div class="fname">8211 - Filial 3</div><input type="file" data-target="8211 f3.xls" accept=".xls,.xlsx"></div>
+      <div class="fstatus" data-status="8211 f3.xls">pendente</div>
+    </div>
+    <button class="primary" id="btnSend" disabled>Enviar atualizacao para o site</button>
+  </div>
+
+  <p class="footer-note">
+    Ao clicar em enviar, cada arquivo selecionado substitui o arquivo correspondente no repositorio do GitHub. O site publico da logistica
+    (<span id="siteLink">logistica.html</span>) busca esses arquivos automaticamente ao abrir a pagina ou ao clicar em "Atualizar do repositorio" - normalmente em poucos segundos ja aparece atualizado para todo mundo, sem precisar de login.
+  </p>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  'use strict';
+  var REPO_OWNER = 'wesleyboibom';
+  var REPO_NAME = 'CONTROLE-FEFO';
+  var BRANCH = 'main';
+  var TOKEN_KEY = 'fefo_logistica_gh_token';
+
+  var tokenInput = document.getElementById('ghToken');
+  var saved = '';
+  try{ saved = localStorage.getItem(TOKEN_KEY) || ''; }catch(e){}
+  if(saved) tokenInput.value = saved;
+
+  document.getElementById('btnSaveToken').addEventListener('click', function(){
+    try{ localStorage.setItem(TOKEN_KEY, tokenInput.value.trim()); showToast('Chave salva neste navegador.'); }
+    catch(e){ showToast('Nao foi possivel salvar a chave neste navegador.', true); }
+  });
+  document.getElementById('btnClearToken').addEventListener('click', function(){
+    tokenInput.value = '';
+    try{ localStorage.removeItem(TOKEN_KEY); }catch(e){}
+    showToast('Chave apagada.');
+  });
+  document.getElementById('btnHowTo').addEventListener('click', function(){
+    var box = document.getElementById('howToBox');
+    box.style.display = box.style.display === 'none' ? 'block' : 'none';
+  });
+
+  var pendingFiles = {};
+  var inputs = document.querySelectorAll('input[type=file]');
+  inputs.forEach(function(inp){
+    inp.addEventListener('change', function(){
+      var target = inp.getAttribute('data-target');
+      var statusEl = document.querySelector('[data-status="' + target + '"]');
+      if(inp.files && inp.files[0]){
+        pendingFiles[target] = inp.files[0];
+        statusEl.textContent = 'selecionado (' + inp.files[0].name + ')';
+        statusEl.className = 'fstatus ok';
+      } else {
+        delete pendingFiles[target];
+        statusEl.textContent = 'pendente';
+        statusEl.className = 'fstatus';
+      }
+      updateSendButton();
+    });
+  });
+
+  function updateSendButton(){
+    var btn = document.getElementById('btnSend');
+    var hasAny = Object.keys(pendingFiles).length > 0;
+    var hasToken = tokenInput.value.trim().length > 0;
+    btn.disabled = !(hasAny && hasToken);
+  }
+  tokenInput.addEventListener('input', updateSendButton);
+
+  function showToast(msg, isErr){
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (isErr ? ' err' : '');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(function(){ t.className = 'toast'; }, 4000);
+  }
+
+  function fileToBase64(file){
+    return new Promise(function(resolve, reject){
+      var reader = new FileReader();
+      reader.onload = function(){
+        var result = reader.result;
+        var base64 = result.substring(result.indexOf(',') + 1);
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function apiUrl(path){
+    return 'https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/contents/' + encodeURIComponent(path);
+  }
+
+  function getExistingSha(path, token){
+    return fetch(apiUrl(path) + '?ref=' + BRANCH, {
+      headers: {
+        'Authorization': 'token ' + token,
+        'Accept': 'application/vnd.github+json'
+      }
+    }).then(function(r){
+      if(r.status === 404) return null;
+      if(!r.ok) return r.json().then(function(j){ throw new Error('Erro ao consultar ' + path + ': ' + (j.message || r.status)); });
+      return r.json().then(function(j){ return j.sha; });
+    });
+  }
+
+  function uploadFile(path, file, token){
+    return fileToBase64(file).then(function(base64){
+      return getExistingSha(path, token).then(function(sha){
+        var body = {
+          message: 'Atualiza ' + path + ' via pagina logistica-editor',
+          content: base64,
+          branch: BRANCH
+        };
+        if(sha) body.sha = sha;
+        return fetch(apiUrl(path), {
+          method: 'PUT',
+          headers: {
+            'Authorization': 'token ' + token,
+            'Accept': 'application/vnd.github+json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(body)
+        }).then(function(r){
+          if(!r.ok) return r.json().then(function(j){ throw new Error((j.message || ('HTTP ' + r.status))); });
+          return true;
+        });
+      });
+    });
+  }
+
+  document.getElementById('btnSend').addEventListener('click', function(){
+    var token = tokenInput.value.trim();
+    if(!token){ showToast('Informe a chave do GitHub antes de enviar.', true); return; }
+    var entries = Object.keys(pendingFiles);
+    if(entries.length === 0){ showToast('Selecione pelo menos um arquivo.', true); return; }
+
+    var btn = document.getElementById('btnSend');
+    btn.disabled = true;
+    btn.textContent = 'Enviando...';
+
+    var chain = Promise.resolve();
+    var okCount = 0, errCount = 0, errMsgs = [];
+    entries.forEach(function(path){
+      chain = chain.then(function(){
+        var statusEl = document.querySelector('[data-status="' + path + '"]');
+        statusEl.textContent = 'enviando...';
+        statusEl.className = 'fstatus';
+        return uploadFile(path, pendingFiles[path], token).then(function(){
+          okCount++;
+          statusEl.textContent = 'atualizado com sucesso';
+          statusEl.className = 'fstatus ok';
+        }).catch(function(err){
+          errCount++;
+          errMsgs.push(path + ': ' + err.message);
+          statusEl.textContent = 'erro: ' + err.message;
+          statusEl.className = 'fstatus err';
+        });
+      });
+    });
+
+    chain.then(function(){
+      btn.disabled = false;
+      btn.textContent = 'Enviar atualizacao para o site';
+      updateSendButton();
+      if(errCount === 0){
+        showToast(okCount + ' arquivo(s) atualizado(s). O site publico vai refletir em instantes.');
+      } else {
+        showToast(okCount + ' ok, ' + errCount + ' com erro. Veja detalhes abaixo de cada arquivo.', true);
+      }
+    });
+  });
+
+  updateSendButton();
+})();
+</script>
+</body>
+</html>

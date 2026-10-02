@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Controle FEFO - Logistica</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#f5f6f4; --surface:#ffffff; --surface-2:#f0f1ee; --text:#1c1e1b; --text-secondary:#5c5f58;
+  --text-muted:#8a8d85; --border:#e0e1dc; --border-strong:#c9cbc3; --accent:#1f4e78; --accent-text:#0c2c45;
+  --accent-bg:#e6eef5; --danger:#a32d2d; --danger-bg:#fcebeb; --amber:#854f0b; --amber-bg:#faeeda;
+  --yellow:#7a6100; --yellow-bg:#fbf4d8; --blue:#185fa5; --blue-bg:#e6f1fb; --green:#27500a; --green-bg:#eaf3de;
+  --gray-bg:#eceae3; --ok:#27500a; --ok-bg:#eaf3de; --warn:#854f0b; --warn-bg:#faeeda;
+  --band-critico:#f2b3b3; --band-b1:#f0cd8f; --band-b2:#ecdf7c; --band-b3:#b3d9f7; --band-b4:#bfe6a3;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16181a; --surface:#1f2123; --surface-2:#26282a; --text:#eceeec; --text-secondary:#aeb1ab;
+    --text-muted:#82857f; --border:#34363a; --border-strong:#46484c; --accent:#7fb0e0; --accent-text:#d6e8fa;
+    --accent-bg:#0c2c45; --danger:#f7c1c1; --danger-bg:#501313; --amber:#fac775; --amber-bg:#412402;
+    --yellow:#f5e08a; --yellow-bg:#4a3d00; --blue:#85b7eb; --blue-bg:#042c53; --green:#97c459; --green-bg:#173404;
+    --gray-bg:#2c2c2a; --ok:#97c459; --ok-bg:#173404; --warn:#fac775; --warn-bg:#412402;
+    --band-critico:#6e2020; --band-b1:#5c3c06; --band-b2:#5f4e00; --band-b3:#0d3d68; --band-b4:#254f0d;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16181a; --surface:#1f2123; --surface-2:#26282a; --text:#eceeec; --text-secondary:#aeb1ab;
+  --text-muted:#82857f; --border:#34363a; --border-strong:#46484c; --accent:#7fb0e0; --accent-text:#d6e8fa;
+  --accent-bg:#0c2c45; --danger:#f7c1c1; --danger-bg:#501313; --amber:#fac775; --amber-bg:#412402;
+  --yellow:#f5e08a; --yellow-bg:#4a3d00; --blue:#85b7eb; --blue-bg:#042c53; --green:#97c459; --green-bg:#173404;
+  --gray-bg:#2c2c2a; --ok:#97c459; --ok-bg:#173404; --warn:#fac775; --warn-bg:#412402;
+  --band-critico:#6e2020; --band-b1:#5c3c06; --band-b2:#5f4e00; --band-b3:#0d3d68; --band-b4:#254f0d;
+}
+:root[data-theme="boibom"]{
+  --bg:#0a2340; --surface:#0f3157; --surface-2:#154070; --text:#eef4fc; --text-secondary:#b7cbe6;
+  --text-muted:#88a5cb; --border:#1e4f80; --border-strong:#2f6499; --accent:#5aa8f2; --accent-text:#eaf3ff;
+  --accent-bg:#154070; --danger:#ff9d9d; --danger-bg:#4a1414; --amber:#ffcf8a; --amber-bg:#4a3005;
+  --yellow:#f5e08a; --yellow-bg:#4a3d00; --blue:#8fc4ff; --blue-bg:#123a63; --green:#a3e07a; --green-bg:#123a1a;
+  --gray-bg:#123a63; --ok:#a3e07a; --ok-bg:#123a1a; --warn:#ffcf8a; --warn-bg:#4a3005;
+  --band-critico:#6e2020; --band-b1:#5c3c06; --band-b2:#5f4e00; --band-b3:#154a7a; --band-b4:#254f0d;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;}
+body{padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0) 0;}
+.wrap{max-width:1900px;margin:0 auto;padding:20px 16px 60px;}
+h1{font-size:20px;font-weight:600;margin:0 0 2px;}
+.subtitle{color:var(--text-secondary);font-size:13px;margin:0 0 18px;}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
+.card .label{font-size:11.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;}
+.card .value{font-size:19px;font-weight:600;margin-top:4px;}
+.card.crit .value{color:var(--danger);}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;}
+.toolbar select, .toolbar input[type=text]{
+  background:var(--surface);color:var(--text);border:1px solid var(--border-strong);border-radius:8px;
+  padding:7px 10px;font-size:13px;
+}
+.toolbar input[type=text]{min-width:180px;flex:1 1 180px;}
+button{
+  background:var(--surface);color:var(--text);border:1px solid var(--border-strong);border-radius:8px;
+  padding:7px 12px;font-size:13px;cursor:pointer;
+}
+button:hover{background:var(--surface-2);}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+button.primary:hover{opacity:.9;}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 6px;}
+.legend-hint{font-size:11.5px;color:var(--text-muted);margin:0 0 8px;}
+.chip{
+  display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:5px 10px;border-radius:20px;
+  border:1px solid var(--border-strong);background:var(--surface);color:var(--text-secondary);cursor:pointer;
+}
+.chip:hover{background:var(--surface-2);}
+.chip.active{background:var(--surface-2);color:var(--text);border-color:var(--chip-color, var(--border-strong));font-weight:600;}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+.tablewrap{overflow:auto;max-height:calc(100vh - 120px);border:1px solid var(--border);border-radius:10px;background:var(--surface);}
+table{border-collapse:collapse;width:100%;min-width:1000px;font-size:13px;}
+th{
+  background:var(--surface-2);color:var(--text-secondary);font-weight:600;font-size:11.5px;
+  text-transform:uppercase;letter-spacing:.02em;text-align:left;padding:9px 8px;border-bottom:1px solid var(--border);
+  white-space:nowrap;position:sticky;top:0;
+}
+td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+td.produto{max-width:360px;}
+td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.band-vencido{background:var(--band-critico);}
+.band-b0{background:var(--band-critico);}
+.band-b1{background:var(--band-b1);}
+.band-b2{background:var(--band-b2);}
+.band-b3{background:var(--band-b3);}
+.band-b4{background:var(--band-b4);}
+.band-b5{background:transparent;}
+.band-sem{background:transparent;}
+.band-vencido td:first-child, .band-b0 td:first-child{box-shadow:inset 4px 0 0 var(--danger);}
+.band-b1 td:first-child{box-shadow:inset 4px 0 0 var(--amber);}
+.band-b2 td:first-child{box-shadow:inset 4px 0 0 var(--yellow);}
+.band-b3 td:first-child{box-shadow:inset 4px 0 0 var(--blue);}
+.band-b4 td:first-child{box-shadow:inset 4px 0 0 var(--green);}
+.hint{font-size:12px;color:var(--text-secondary);margin:6px 0 10px;line-height:1.5;}
+.foot-note{font-size:11.5px;color:var(--text-muted);margin-top:14px;line-height:1.6;}
+.empty{padding:30px;text-align:center;color:var(--text-muted);font-size:13px;}
+.theme-toggle{display:flex;gap:6px;}
+.theme-toggle button{padding:6px 12px;font-size:12.5px;}
+.theme-toggle button.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+.print-only{display:none;}
+.print-table{width:100%;border-collapse:collapse;font-size:11px;}
+.print-table th, .print-table td{border:1px solid #999;padding:3px 6px;text-align:left;}
+.print-table th{background:#eee;}
+.print-table td.num{text-align:right;font-variant-numeric:tabular-nums;}
+@media print{
+  @page{ size: landscape; margin: 12mm; }
+  body{ background:#fff; }
+  .toolbar, .legend, .legend-hint, #autoLoadBanner, .theme-toggle, .foot-note, .tablewrap{
+    display:none !important;
+  }
+  .print-only{ display:block !important; }
+  * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+    <div>
+      <h1>Controle FEFO - Logistica</h1>
+      <p class="subtitle">Preco tabela e disponibilidade por item. Ordenado por dias a vencer.</p>
+      <p class="hint" id="autoLoadBanner" style="margin:2px 0 0"></p>
+    </div>
+    <div class="theme-toggle" id="themeToggle">
+      <button type="button" data-theme-opt="light">Claro</button>
+      <button type="button" data-theme-opt="boibom">Azul</button>
+    </div>
+  </div>
+
+  <div class="print-only" id="printHeader"></div>
+  <div class="print-only" id="printTableWrap"></div>
+
+  <div class="cards" id="cards"></div>
+
+  <div class="toolbar">
+    <button class="primary" id="btnAutoReload">Atualizar do repositorio</button>
+    <button id="btnPrint">Imprimir relatorio</button>
+    <button id="btnExportCsv">Exportar CSV</button>
+  </div>
+
+  <p class="legend-hint">Clique numa ou mais faixas pra filtrar a tabela por dias a vencer:</p>
+  <div class="legend" id="legend"></div>
+
+  <div class="toolbar">
+    <select id="filFilial">
+      <option value="">Todas as filiais</option>
+      <option value="1">Filial 1</option>
+      <option value="3">Filial 3</option>
+    </select>
+    <select id="filStatus">
+      <option value="">Normal + Avaria</option>
+      <option value="normal">Somente normal</option>
+      <option value="avaria">Somente avaria</option>
+    </select>
+    <select id="filEstoque">
+      <option value="">Bloqueado + Pendente + Disponivel</option>
+      <option value="bloqueado">Somente bloqueado</option>
+      <option value="pendente">Somente pendente</option>
+      <option value="ambos">Bloqueado ou pendente</option>
+      <option value="disponivel">Somente disponivel (no WMS)</option>
+    </select>
+    <input type="text" id="filBusca" placeholder="Buscar produto...">
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:30%">Produto</th>
+          <th>Filial</th>
+          <th>Un.</th>
+          <th>Disponivel</th>
+          <th>Bloqueado</th>
+          <th>Pendente</th>
+          <th id="thDias" style="cursor:pointer">Dias a vencer &#8645;</th>
+          <th>Validade</th>
+          <th>Preco tabela (R$)</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <p class="foot-note">
+    Esta e uma versao reduzida do Controle FEFO, so com preco de tabela e disponibilidade - sem custo,
+    markup ou margem. Os dados sao lidos automaticamente dos arquivos 1707/8211 do repositorio ao abrir
+    a pagina ou ao clicar em "Atualizar do repositorio".
+  </p>
+</div>
+
+<script>
+(function(){
+  var THEME_KEY = 'fefo_theme_v1';
+
+  function applyTheme(theme){
+    if(theme === 'boibom') document.documentElement.setAttribute('data-theme', 'boibom');
+    else document.documentElement.setAttribute('data-theme', 'light');
+    var buttons = document.querySelectorAll('#themeToggle button');
+    for(var i=0; i<buttons.length; i++){
+      buttons[i].classList.toggle('active', buttons[i].getAttribute('data-theme-opt') === theme);
+    }
+    try{ localStorage.setItem(THEME_KEY, theme); }catch(e){}
+  }
+  (function initTheme(){
+    var saved = 'light';
+    try{ saved = localStorage.getItem(THEME_KEY) || 'light'; }catch(e){}
+    applyTheme(saved);
+    var buttons = document.querySelectorAll('#themeToggle button');
+    for(var i=0; i<buttons.length; i++){
+      buttons[i].addEventListener('click', function(){ applyTheme(this.getAttribute('data-theme-opt')); });
+    }
+  })();
+
+  var items = [];
+  var sortAsc = true;
+  var activeBands;
+
+  function parseNum(s){
+    if(typeof s === 'number') return s;
+    if(s === undefined || s === null) return null;
+    s = String(s).trim();
+    if(s === '') return null;
+    if(s.indexOf(',') > -1 && s.indexOf('.') > -1){
+      s = s.replace(/\./g,'').replace(',', '.');
+    } else if(s.indexOf(',') > -1){
+      s = s.replace(',', '.');
+    }
+    var n = parseFloat(s);
+    return isNaN(n) ? null : n;
+  }
+
+  var BAND_DEFS = [
+    {key:'vencido', label:'Vencido', varColor:'--danger'},
+    {key:'b0', label:'0-9 dias', varColor:'--danger'},
+    {key:'b1', label:'10-19 dias', varColor:'--amber'},
+    {key:'b2', label:'20-29 dias', varColor:'--yellow'},
+    {key:'b3', label:'30-39 dias', varColor:'--blue'},
+    {key:'b4', label:'40-59 dias', varColor:'--green'},
+    {key:'b5', label:'60+ dias', varColor:'--text-muted'},
+    {key:'sem', label:'Sem dias informado', varColor:'--text-muted'}
+  ];
+  activeBands = new Set(BAND_DEFS.map(function(b){ return b.key; }));
+
+  function bandKey(dias){
+    if(dias === null || dias === undefined || isNaN(dias)) return 'sem';
+    if(dias < 0) return 'vencido';
+    if(dias <= 9) return 'b0';
+    if(dias <= 19) return 'b1';
+    if(dias <= 29) return 'b2';
+    if(dias <= 39) return 'b3';
+    if(dias <= 59) return 'b4';
+    return 'b5';
+  }
+
+  function fmtMoney(n){
+    if(n === null || n === undefined || isNaN(n)) return '-';
+    return 'R$ ' + n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+
+  function matchesEstoqueFilter(it){
+    var v = document.getElementById('filEstoque').value;
+    if(v === 'bloqueado') return it.bloq > 0;
+    if(v === 'pendente') return it.pend > 0;
+    if(v === 'ambos') return (it.bloq > 0) || (it.pend > 0);
+    if(v === 'disponivel') return (it.q || 0) > 0;
+    return true;
+  }
+
+  function baseFiltered(){
+    var filFilial = document.getElementById('filFilial').value;
+    var busca = document.getElementById('filBusca').value.trim().toLowerCase();
+    return items.filter(function(it){
+      if(filFilial && String(it.f) !== filFilial) return false;
+      if(busca && it.p.toLowerCase().indexOf(busca) === -1) return false;
+      return true;
+    });
+  }
+
+  function getFiltered(){
+    var filStatus = document.getElementById('filStatus').value;
+    var list = baseFiltered().filter(function(it){
+      if(!activeBands.has(bandKey(it.d))) return false;
+      if(filStatus && (it.st || 'normal') !== filStatus) return false;
+      if(!matchesEstoqueFilter(it)) return false;
+      return true;
+    });
+    list.sort(function(a,b){
+      var da = (a.d === null || a.d === undefined) ? 9999 : a.d;
+      var db = (b.d === null || b.d === undefined) ? 9999 : b.d;
+      return sortAsc ? da - db : db - da;
+    });
+    return list;
+  }
+
+  function renderLegend(){
+    var counts = {};
+    BAND_DEFS.forEach(function(b){ counts[b.key] = 0; });
+    baseFiltered().forEach(function(it){ counts[bandKey(it.d)]++; });
+
+    var wrap = document.getElementById('legend');
+    wrap.innerHTML = '';
+    BAND_DEFS.forEach(function(b){
+      var btn = document.createElement('button');
+      var active = activeBands.has(b.key);
+      btn.type = 'button';
+      btn.className = 'chip' + (active ? ' active' : '');
+      btn.style.setProperty('--chip-color', 'var(' + b.varColor + ')');
+      btn.innerHTML = '<span class="dot" style="background:var(' + b.varColor + ')"></span>' + b.label + ' (' + counts[b.key] + ')';
+      btn.addEventListener('click', function(){
+        if(activeBands.has(b.key)) activeBands.delete(b.key); else activeBands.add(b.key);
+        render();
+      });
+      wrap.appendChild(btn);
+    });
+    var btnAll = document.createElement('button');
+    btnAll.type = 'button'; btnAll.className = 'chip'; btnAll.textContent = 'Marcar todas';
+    btnAll.addEventListener('click', function(){ activeBands = new Set(BAND_DEFS.map(function(b){return b.key;})); render(); });
+    wrap.appendChild(btnAll);
+    var btnNone = document.createElement('button');
+    btnNone.type = 'button'; btnNone.className = 'chip'; btnNone.textContent = 'Limpar';
+    btnNone.addEventListener('click', function(){ activeBands = new Set(); render(); });
+    wrap.appendChild(btnNone);
+  }
+
+  function render(){
+    var tbody = document.getElementById('tbody');
+    var list = getFiltered();
+    tbody.innerHTML = '';
+    if(list.length === 0){
+      var tr = document.createElement('tr');
+      var td = document.createElement('td');
+      td.colSpan = 9; td.className = 'empty';
+      td.textContent = 'Nenhum item nessa selecao. Ajuste os filtros de dias a vencer, filial, status ou busca.';
+      tr.appendChild(td); tbody.appendChild(tr);
+    }
+    list.forEach(function(it){
+      var tr = document.createElement('tr');
+      tr.className = 'band-' + bandKey(it.d);
+      function td(text, cls){ var d = document.createElement('td'); if(cls) d.className = cls; d.textContent = text; return d; }
+      tr.appendChild(td(it.p, 'produto'));
+      tr.appendChild(td(it.f ? 'Filial ' + it.f : '-'));
+      tr.appendChild(td(it.u || '-'));
+      tr.appendChild(td(it.q === null || it.q === undefined ? '-' : it.q, 'num'));
+      tr.appendChild(td(it.bloq ? it.bloq : '-', 'num'));
+      tr.appendChild(td(it.pend ? it.pend : '-', 'num'));
+      tr.appendChild(td(it.d === null || it.d === undefined ? '-' : it.d, 'num'));
+      tr.appendChild(td(it.v || '-'));
+      tr.appendChild(td(it.s === null || it.s === undefined ? '-' : fmtMoney(it.s), 'num'));
+      tbody.appendChild(tr);
+    });
+
+    renderLegend();
+    renderCards(list);
+  }
+
+  function renderCards(list){
+    var totalItens = list.length;
+    var vencidos = list.filter(function(it){ return it.d !== null && it.d !== undefined && it.d < 0; }).length;
+    var criticos = list.filter(function(it){ return it.d !== null && it.d !== undefined && it.d >= 0 && it.d <= 9; }).length;
+    var avaria = list.filter(function(it){ return it.st === 'avaria'; }).length;
+
+    var cards = document.getElementById('cards');
+    cards.innerHTML = '';
+    cards.appendChild(makeCard('Itens listados', totalItens, false));
+    cards.appendChild(makeCard('Itens vencidos', vencidos, vencidos > 0));
+    cards.appendChild(makeCard('Itens criticos (0-9 dias)', criticos, criticos > 0));
+    cards.appendChild(makeCard('Itens em avaria', avaria, avaria > 0));
+  }
+  function makeCard(label, value, crit){
+    var div = document.createElement('div'); div.className = 'card' + (crit ? ' crit' : '');
+    var l = document.createElement('div'); l.className = 'label'; l.textContent = label;
+    var v = document.createElement('div'); v.className = 'value'; v.textContent = value;
+    div.appendChild(l); div.appendChild(v);
+    return div;
+  }
+
+  document.getElementById('filFilial').addEventListener('change', render);
+  document.getElementById('filStatus').addEventListener('change', render);
+  document.getElementById('filEstoque').addEventListener('change', render);
+  document.getElementById('filBusca').addEventListener('input', render);
+  document.getElementById('thDias').addEventListener('click', function(){ sortAsc = !sortAsc; render(); });
+
+  document.getElementById('btnExportCsv').addEventListener('click', async function(){
+    var header = ['Produto','Filial','Un','Disponivel','Bloqueado','Pendente','Dias a vencer','Validade','Preco tabela'];
+    var rows = [header.join(';')];
+    getFiltered().forEach(function(it){
+      rows.push([it.p, it.f, it.u, it.q, it.bloq || '', it.pend || '', it.d, it.v, it.s === null || it.s === undefined ? '' : it.s].join(';'));
+    });
+    var csv = rows.join('\n');
+    var blob = new Blob([csv], {type:'text/csv'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a'); a.href = url; a.download = 'controle_fefo_logistica.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  /* ---------------- Impressao (relatorio em texto puro) ---------------- */
+  function buildPrintHeader(){
+    var el = document.getElementById('printHeader');
+    if(!el) return;
+    el.innerHTML = '';
+    var filFilial = document.getElementById('filFilial');
+    var filStatus = document.getElementById('filStatus');
+    var filEstoque = document.getElementById('filEstoque');
+    var busca = document.getElementById('filBusca').value.trim();
+    var filialLabel = filFilial.options[filFilial.selectedIndex].textContent;
+    var statusLabel = filStatus.options[filStatus.selectedIndex].textContent;
+    var estoqueLabel = filEstoque.options[filEstoque.selectedIndex].textContent;
+    var bandLabels = BAND_DEFS.filter(function(b){ return activeBands.has(b.key); }).map(function(b){ return b.label; });
+    var bandsText = bandLabels.length === BAND_DEFS.length ? 'Todas as faixas' :
+      (bandLabels.length ? bandLabels.join(', ') : 'Nenhuma faixa selecionada');
+    var now = new Date();
+    var dataHora = pad2(now.getDate())+'/'+pad2(now.getMonth()+1)+'/'+now.getFullYear()+' '+pad2(now.getHours())+':'+pad2(now.getMinutes());
+    var count = getFiltered().length;
+
+    var h = document.createElement('h1'); h.style.margin = '0 0 4px'; h.textContent = 'Controle FEFO - Logistica';
+    var pMeta = document.createElement('p'); pMeta.style.cssText = 'margin:0 0 10px;color:#333';
+    pMeta.textContent = 'Gerado em ' + dataHora + ' - ' + count + ' item(ns)';
+    var pFiltros = document.createElement('p'); pFiltros.style.cssText = 'margin:0 0 14px;color:#333';
+    pFiltros.textContent = 'Filial: ' + filialLabel + ' | Status: ' + statusLabel + ' | Estoque: ' + estoqueLabel +
+      (busca ? ' | Busca: "' + busca + '"' : '') + ' | Faixas: ' + bandsText;
+
+    el.appendChild(h); el.appendChild(pMeta); el.appendChild(pFiltros);
+  }
+
+  function buildPrintTable(){
+    var wrap = document.getElementById('printTableWrap');
+    if(!wrap) return;
+    wrap.innerHTML = '';
+    var list = getFiltered();
+    var table = document.createElement('table'); table.className = 'print-table';
+    var thead = document.createElement('thead'); var trh = document.createElement('tr');
+    ['Produto','Filial','Un.','Disponivel','Bloqueado','Pendente','Dias a vencer','Validade','Preco tabela (R$)']
+      .forEach(function(txt){ var th = document.createElement('th'); th.textContent = txt; trh.appendChild(th); });
+    thead.appendChild(trh); table.appendChild(thead);
+
+    var tbody = document.createElement('tbody');
+    list.forEach(function(it){
+      var tr = document.createElement('tr'); tr.className = 'band-' + bandKey(it.d);
+      function td(text, num){ var d = document.createElement('td'); if(num) d.className = 'num'; d.textContent = text; return d; }
+      tr.appendChild(td(it.p));
+      tr.appendChild(td(it.f ? 'Filial ' + it.f : '-'));
+      tr.appendChild(td(it.u || '-'));
+      tr.appendChild(td(it.q === null || it.q === undefined ? '-' : it.q, true));
+      tr.appendChild(td(it.bloq ? it.bloq : '-', true));
+      tr.appendChild(td(it.pend ? it.pend : '-', true));
+      tr.appendChild(td(it.d === null || it.d === undefined ? '-' : it.d, true));
+      tr.appendChild(td(it.v || '-'));
+      tr.appendChild(td(it.s === null || it.s === undefined ? '-' : fmtMoney(it.s), true));
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+  }
+
+  document.getElementById('btnPrint').addEventListener('click', function(){
+    buildPrintHeader();
+    buildPrintTable();
+    window.print();
+  });
+
+  /* ---------------- Leitura automatica dos arquivos do repositorio ---------------- */
+  function excelDateToStr(val){
+    if(val === null || val === undefined || val === '') return '';
+    if(val instanceof Date){
+      return pad2(val.getDate()) + '/' + pad2(val.getMonth()+1) + '/' + String(val.getFullYear()).slice(-2);
+    }
+    if(typeof val === 'number'){
+      var ms = Date.UTC(1899, 11, 30) + val * 86400000;
+      var d = new Date(ms);
+      return pad2(d.getUTCDate()) + '/' + pad2(d.getUTCMonth()+1) + '/' + String(d.getUTCFullYear()).slice(-2);
+    }
+    return String(val).trim();
+  }
+  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+
+  var COL_1707_DEFAULT = {cod:0, desc:1, status:7, valid:9, dias:10, qtd:16};
+  function looksLike1707(rows){
+    for(var i=0; i<Math.min(rows.length, 5); i++){
+      var row = rows[i];
+      if(row && typeof row[0] === 'number' && typeof row[1] === 'string' && row.length >= 14){
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /* Cruza os arquivos 8211 (preco tabela/estoque) com os arquivos 1707
+     (validade) ja lidos. Nao exibe nem usa o custo +ICMS - so o preco de
+     venda (tabela), bloqueado, pendente e unidade. */
+  function crossReference(costFiles, fefoFiles){
+    var prodCol = 0, vendaCol = 14, unCol = 1, bloqCol = 7, pendCol = 8;
+    var costIndex = {};
+    costFiles.forEach(function(cf){
+      var filial = cf.filial || '?';
+      cf.rows.forEach(function(row){
+        if(!row || row[prodCol] === null || row[prodCol] === undefined) return;
+        var prodStr = String(row[prodCol]);
+        if(prodStr.indexOf(' - ') === -1) return;
+        var code = prodStr.split(' - ')[0].trim();
+        var venda = parseNum(row[vendaCol]);
+        var un = row[unCol] ? String(row[unCol]).trim().toUpperCase() : null;
+        var bloq = parseNum(row[bloqCol]);
+        var pend = parseNum(row[pendCol]);
+        if(!costIndex[code]) costIndex[code] = [];
+        costIndex[code].push({filial: filial, venda: venda, un: un, bloq: bloq, pend: pend});
+      });
+    });
+
+    var result = [];
+    fefoFiles.forEach(function(ff){
+      var fileFilial = ff.filial || '';
+      var frows = ff.rows;
+      if(!looksLike1707(frows)) return;
+      for(var r=0; r<frows.length; r++){
+        var row = frows[r];
+        if(!row) continue;
+        if(row[COL_1707_DEFAULT.cod] === null || row[COL_1707_DEFAULT.cod] === undefined) continue;
+        var code = String(row[COL_1707_DEFAULT.cod]).trim().replace(/\.0$/, '');
+        if(code === '') continue;
+        var desc = row[COL_1707_DEFAULT.desc] === null ? '' : String(row[COL_1707_DEFAULT.desc]).trim();
+        var prodStr = code + ' - ' + desc;
+
+        var qtd = parseNum(row[COL_1707_DEFAULT.qtd]);
+        if(qtd === null) continue;
+        var dias = parseNum(row[COL_1707_DEFAULT.dias]);
+        var valid = excelDateToStr(row[COL_1707_DEFAULT.valid]);
+        var statusRaw = row[COL_1707_DEFAULT.status] !== null && row[COL_1707_DEFAULT.status] !== undefined
+          ? String(row[COL_1707_DEFAULT.status]).trim().toUpperCase() : '';
+        var itemStatus = statusRaw.indexOf('AVARIA') > -1 ? 'avaria' : 'normal';
+
+        var matches = costIndex[code] || [];
+        var filial = fileFilial, venda = null, un = 'KG', bloq = null, pend = null;
+        var exact = fileFilial ? matches.filter(function(m){ return m.filial === fileFilial; }) : [];
+        var pick = exact.length ? exact[0] : (matches[0] || null);
+        if(pick){
+          venda = pick.venda; bloq = pick.bloq; pend = pick.pend;
+          if(pick.un) un = pick.un;
+          if(!filial) filial = pick.filial;
+        }
+        result.push({p: prodStr, f: filial, u: un, q: qtd, d: dias, v: valid, s: venda, st: itemStatus, bloq: bloq, pend: pend});
+      }
+    });
+    return result;
+  }
+
+  var AUTO_IMPORT_FILES = {
+    fefo: [
+      {file: '1707 f1.xls', filial: '1'},
+      {file: '1707 f3.xls', filial: '3'}
+    ],
+    custo: [
+      {file: '8211 f1.xls', filial: '1'},
+      {file: '8211 f3.xls', filial: '3'}
+    ]
+  };
+
+  function readWorkbookRowsFromUrl(url){
+    var bustUrl = url + (url.indexOf('?') > -1 ? '&' : '?') + '_=' + Date.now();
+    return fetch(bustUrl, {cache: 'no-store'}).then(function(r){
+      if(!r.ok) throw new Error('HTTP ' + r.status + ' ao buscar ' + url);
+      return r.arrayBuffer();
+    }).then(function(buf){
+      var wb = XLSX.read(buf, {type:'array', cellDates:true});
+      var sheet = wb.Sheets[wb.SheetNames[0]];
+      return XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:null});
+    });
+  }
+
+  function setAutoLoadBanner(text){
+    var el = document.getElementById('autoLoadBanner');
+    if(el) el.textContent = text;
+  }
+
+  async function tryAutoImport(){
+    try{
+      setAutoLoadBanner('Buscando arquivos no repositorio...');
+      var custoResults = await Promise.allSettled(AUTO_IMPORT_FILES.custo.map(function(f){
+        return readWorkbookRowsFromUrl(encodeURIComponent(f.file)).then(function(rows){ return {rows: rows, filial: f.filial, name: f.file}; });
+      }));
+      var fefoResults = await Promise.allSettled(AUTO_IMPORT_FILES.fefo.map(function(f){
+        return readWorkbookRowsFromUrl(encodeURIComponent(f.file)).then(function(rows){ return {rows: rows, filial: f.filial, name: f.file}; });
+      }));
+      var costFilesRead = custoResults.filter(function(r){ return r.status === 'fulfilled'; }).map(function(r){ return r.value; });
+      var fefoFilesRead = fefoResults.filter(function(r){ return r.status === 'fulfilled'; }).map(function(r){ return r.value; });
+
+      if(costFilesRead.length === 0 || fefoFilesRead.length === 0){
+        setAutoLoadBanner('Nenhum arquivo 1707/8211 encontrado no repositorio nesse local.');
+        return;
+      }
+
+      var result = crossReference(costFilesRead, fefoFilesRead);
+      if(result.length === 0){
+        setAutoLoadBanner('Os arquivos do repositorio nao produziram nenhum item.');
+        return;
+      }
+
+      items = result;
+      render();
+      var now = new Date();
+      setAutoLoadBanner('Dados carregados em ' + pad2(now.getDate()) + '/' + pad2(now.getMonth()+1) + '/' + now.getFullYear() +
+        ' as ' + pad2(now.getHours()) + ':' + pad2(now.getMinutes()) + ' (' + fefoFilesRead.length + ' arquivo(s) 1707, ' + costFilesRead.length + ' arquivo(s) 8211).');
+    }catch(e){
+      console.error('Leitura automatica dos arquivos do repositorio falhou:', e);
+      setAutoLoadBanner('Nao foi possivel buscar os arquivos do repositorio agora.');
+    }
+  }
+
+  document.getElementById('btnAutoReload').addEventListener('click', function(){
+    tryAutoImport();
+  });
+
+  render();
+  tryAutoImport();
+})();
+</script>
+</body>
+</html>

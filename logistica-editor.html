@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Controle FEFO - Atualizar dados (Logistica)</title>
+<title>Controle FEFO - Atualizar 1707 (Logistica)</title>
 <style>
 :root{
   --bg:#f5f6f4; --surface:#ffffff; --surface-2:#f0f1ee; --text:#1c1e1b; --text-secondary:#5c5f58;
@@ -27,6 +27,7 @@ h1{font-size:20px;font-weight:600;margin:0 0 2px;}
 .panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px;}
 .panel h2{font-size:14px;margin:0 0 10px;}
 .panel p.help{font-size:12.5px;color:var(--text-muted);margin:0 0 12px;line-height:1.5;}
+.note{background:var(--accent-bg);color:var(--accent-text);border-radius:8px;padding:10px 12px;font-size:12.5px;line-height:1.5;margin-bottom:16px;}
 label{display:block;font-size:12.5px;color:var(--text-secondary);margin-bottom:5px;font-weight:600;}
 input[type=password], input[type=text]{
   width:100%;background:var(--surface-2);color:var(--text);border:1px solid var(--border-strong);
@@ -59,8 +60,14 @@ button.linksmall{background:none;border:none;color:var(--accent);padding:0;font-
 </head>
 <body>
 <div class="wrap">
-  <h1>Atualizar dados - Controle FEFO Logistica</h1>
-  <p class="subtitle">Pagina de uso restrito para atualizar os arquivos que alimentam o site publico da logistica (preco de tabela, quantidade e dias a vencer). Nao use este link no grupo - ele nao e o site de consulta.</p>
+  <h1>Atualizar validade (1707) - Logistica</h1>
+  <p class="subtitle">Pagina de uso restrito para a logistica enviar a rotina 1707 (filial 1 e filial 3) todo sabado. Nao use este link no grupo - ele nao e o site de consulta.</p>
+
+  <div class="note">
+    Esta pagina atualiza apenas <strong>quantidade disponivel, dias a vencer, validade e status (normal/avaria)</strong>.
+    O <strong>preco de tabela</strong> nao muda por aqui - isso continua sendo atualizado manualmente pelo Wesley
+    toda segunda-feira com a rotina 8211.
+  </div>
 
   <div class="panel">
     <h2>1. Chave de acesso do GitHub</h2>
@@ -81,8 +88,8 @@ button.linksmall{background:none;border:none;color:var(--accent);padding:0;font-
   </div>
 
   <div class="panel">
-    <h2>2. Selecionar os 4 arquivos</h2>
-    <p class="help">Selecione os relatorios exportados do WMS. Os nomes dos arquivos nao importam - o que importa e qual campo voce usa para cada um.</p>
+    <h2>2. Selecionar a rotina 1707</h2>
+    <p class="help">Selecione os relatorios 1707 (validade) exportados do WMS, um por filial.</p>
     <div class="filerow">
       <div><div class="fname">1707 - Filial 1</div><input type="file" data-target="1707 f1.xls" accept=".xls,.xlsx"></div>
       <div class="fstatus" data-status="1707 f1.xls">pendente</div>
@@ -91,20 +98,14 @@ button.linksmall{background:none;border:none;color:var(--accent);padding:0;font-
       <div><div class="fname">1707 - Filial 3</div><input type="file" data-target="1707 f3.xls" accept=".xls,.xlsx"></div>
       <div class="fstatus" data-status="1707 f3.xls">pendente</div>
     </div>
-    <div class="filerow">
-      <div><div class="fname">8211 - Filial 1</div><input type="file" data-target="8211 f1.xls" accept=".xls,.xlsx"></div>
-      <div class="fstatus" data-status="8211 f1.xls">pendente</div>
-    </div>
-    <div class="filerow">
-      <div><div class="fname">8211 - Filial 3</div><input type="file" data-target="8211 f3.xls" accept=".xls,.xlsx"></div>
-      <div class="fstatus" data-status="8211 f3.xls">pendente</div>
-    </div>
     <button class="primary" id="btnSend" disabled>Enviar atualizacao para o site</button>
   </div>
 
   <p class="footer-note">
-    Ao clicar em enviar, cada arquivo selecionado substitui o arquivo correspondente no repositorio do GitHub. O site publico da logistica
-    (<span id="siteLink">logistica.html</span>) busca esses arquivos automaticamente ao abrir a pagina ou ao clicar em "Atualizar do repositorio" - normalmente em poucos segundos ja aparece atualizado para todo mundo, sem precisar de login.
+    Ao clicar em enviar, cada arquivo selecionado substitui o arquivo 1707 correspondente no repositorio do GitHub.
+    O site publico da logistica (logistica.html) busca esse arquivo automaticamente ao abrir a pagina ou ao clicar em
+    "Atualizar do repositorio" - em poucos segundos ja aparece atualizado para todo mundo, sem precisar de login.
+    O preco de tabela mostrado continua sendo o da ultima atualizacao da rotina 8211, feita pelo Wesley.
   </p>
 </div>
 
@@ -238,7 +239,7 @@ button.linksmall{background:none;border:none;color:var(--accent);padding:0;font-
     btn.textContent = 'Enviando...';
 
     var chain = Promise.resolve();
-    var okCount = 0, errCount = 0, errMsgs = [];
+    var okCount = 0, errCount = 0;
     entries.forEach(function(path){
       chain = chain.then(function(){
         var statusEl = document.querySelector('[data-status="' + path + '"]');
@@ -250,7 +251,6 @@ button.linksmall{background:none;border:none;color:var(--accent);padding:0;font-
           statusEl.className = 'fstatus ok';
         }).catch(function(err){
           errCount++;
-          errMsgs.push(path + ': ' + err.message);
           statusEl.textContent = 'erro: ' + err.message;
           statusEl.className = 'fstatus err';
         });

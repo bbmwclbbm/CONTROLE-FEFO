@@ -12,7 +12,8 @@
   --accent-bg:#e6eef5; --danger:#a32d2d; --danger-bg:#fcebeb; --amber:#854f0b; --amber-bg:#faeeda;
   --yellow:#7a6100; --yellow-bg:#fbf4d8; --blue:#185fa5; --blue-bg:#e6f1fb; --green:#27500a; --green-bg:#eaf3de;
   --gray-bg:#eceae3; --ok:#27500a; --ok-bg:#eaf3de; --warn:#854f0b; --warn-bg:#faeeda;
-  --band-critico:#f2b3b3; --band-b1:#f0cd8f; --band-b2:#ecdf7c; --band-b3:#b3d9f7; --band-b4:#bfe6a3;
+  --band-critico:#f2b3b3; --band-b0:#f6cf9e; --band-b1:#f0cd8f; --band-b2:#ecdf7c; --band-b3:#b3d9f7; --band-b4:#bfe6a3;
+  --orange:#b35900;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
@@ -21,7 +22,8 @@
     --accent-bg:#0c2c45; --danger:#f7c1c1; --danger-bg:#501313; --amber:#fac775; --amber-bg:#412402;
     --yellow:#f5e08a; --yellow-bg:#4a3d00; --blue:#85b7eb; --blue-bg:#042c53; --green:#97c459; --green-bg:#173404;
     --gray-bg:#2c2c2a; --ok:#97c459; --ok-bg:#173404; --warn:#fac775; --warn-bg:#412402;
-    --band-critico:#6e2020; --band-b1:#5c3c06; --band-b2:#5f4e00; --band-b3:#0d3d68; --band-b4:#254f0d;
+    --band-critico:#6e2020; --band-b0:#7a3b0a; --band-b1:#5c3c06; --band-b2:#5f4e00; --band-b3:#0d3d68; --band-b4:#254f0d;
+    --orange:#f2a65a;
   }
 }
 :root[data-theme="dark"]{
@@ -30,7 +32,8 @@
   --accent-bg:#0c2c45; --danger:#f7c1c1; --danger-bg:#501313; --amber:#fac775; --amber-bg:#412402;
   --yellow:#f5e08a; --yellow-bg:#4a3d00; --blue:#85b7eb; --blue-bg:#042c53; --green:#97c459; --green-bg:#173404;
   --gray-bg:#2c2c2a; --ok:#97c459; --ok-bg:#173404; --warn:#fac775; --warn-bg:#412402;
-  --band-critico:#6e2020; --band-b1:#5c3c06; --band-b2:#5f4e00; --band-b3:#0d3d68; --band-b4:#254f0d;
+  --band-critico:#6e2020; --band-b0:#7a3b0a; --band-b1:#5c3c06; --band-b2:#5f4e00; --band-b3:#0d3d68; --band-b4:#254f0d;
+  --orange:#f2a65a;
 }
 :root[data-theme="boibom"]{
   --bg:#0a2340; --surface:#0f3157; --surface-2:#154070; --text:#eef4fc; --text-secondary:#b7cbe6;
@@ -38,7 +41,8 @@
   --accent-bg:#154070; --danger:#ff9d9d; --danger-bg:#4a1414; --amber:#ffcf8a; --amber-bg:#4a3005;
   --yellow:#f5e08a; --yellow-bg:#4a3d00; --blue:#8fc4ff; --blue-bg:#123a63; --green:#a3e07a; --green-bg:#123a1a;
   --gray-bg:#123a63; --ok:#a3e07a; --ok-bg:#123a1a; --warn:#ffcf8a; --warn-bg:#4a3005;
-  --band-critico:#6e2020; --band-b1:#5c3c06; --band-b2:#5f4e00; --band-b3:#154a7a; --band-b4:#254f0d;
+  --band-critico:#6e2020; --band-b0:#7a3b0a; --band-b1:#5c3c06; --band-b2:#5f4e00; --band-b3:#154a7a; --band-b4:#254f0d;
+  --orange:#f2a65a;
 }
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;}
@@ -104,14 +108,15 @@ td.rm button:hover{color:var(--danger);background:var(--danger-bg);border-radius
 tfoot td{font-weight:600;background:var(--surface-2);border-top:2px solid var(--border-strong);border-bottom:none;}
 tfoot td.readonly{color:var(--text);}
 .band-vencido{background:var(--band-critico);}
-.band-b0{background:var(--band-critico);}
+.band-b0{background:var(--band-b0);}
 .band-b1{background:var(--band-b1);}
 .band-b2{background:var(--band-b2);}
 .band-b3{background:var(--band-b3);}
 .band-b4{background:var(--band-b4);}
 .band-b5{background:transparent;}
 .band-sem{background:transparent;}
-.band-vencido td:first-child, .band-b0 td:first-child{box-shadow:inset 4px 0 0 var(--danger);}
+.band-vencido td:first-child{box-shadow:inset 4px 0 0 var(--danger);}
+.band-b0 td:first-child{box-shadow:inset 4px 0 0 var(--orange);}
 .band-b1 td:first-child{box-shadow:inset 4px 0 0 var(--amber);}
 .band-b2 td:first-child{box-shadow:inset 4px 0 0 var(--yellow);}
 .band-b3 td:first-child{box-shadow:inset 4px 0 0 var(--blue);}
@@ -163,7 +168,8 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
 .print-table th, .print-table td{border:1px solid var(--border-strong);padding:3px 6px;text-align:left;color:var(--text);}
 .print-table th{background:var(--surface-2);font-weight:600;}
 .print-table td.num{text-align:right;font-variant-numeric:tabular-nums;}
-.print-table tr.band-vencido, .print-table tr.band-b0{background:var(--band-critico);}
+.print-table tr.band-vencido{background:var(--band-critico);}
+.print-table tr.band-b0{background:var(--band-b0);}
 .print-table tr.band-b1{background:var(--band-b1);}
 .print-table tr.band-b2{background:var(--band-b2);}
 .print-table tr.band-b3{background:var(--band-b3);}
@@ -708,7 +714,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
 
   var BAND_DEFS = [
     {key:'vencido', label:'Vencido', varColor:'--danger'},
-    {key:'b0', label:'0-9 dias', varColor:'--danger'},
+    {key:'b0', label:'0-9 dias', varColor:'--orange'},
     {key:'b1', label:'10-19 dias', varColor:'--amber'},
     {key:'b2', label:'20-29 dias', varColor:'--yellow'},
     {key:'b3', label:'30-39 dias', varColor:'--blue'},
@@ -921,7 +927,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
 
     renderLegend();
     renderFilialSummary();
-    renderCards(list, baseFiltered());
+    renderCards(list);
   }
 
   function diasCell(it){
@@ -942,7 +948,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     return td;
   }
 
-  function renderCards(list, statusBase){
+  function renderCards(list){
     var totalItens = list.length;
     var totalCusto = list.reduce(function(s,it){ return s + (it.q||0)*(it.c||0); }, 0);
     var vencidos = list.filter(function(it){ return it.d !== null && it.d !== undefined && it.d < 0; }).length;
@@ -958,15 +964,18 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     cards.appendChild(makeCard('Valor total (custo)', fmtMoney(totalCusto), false));
     cards.appendChild(makeCard('Valor total (venda)', comVenda.length ? fmtMoney(totalVenda) : '-', false));
 
-    if(statusBase){
-      var avariaItens = statusBase.filter(isAvaria);
-      var normalItens = statusBase.filter(function(it){ return !isAvaria(it); });
-      var custoAvaria = avariaItens.reduce(function(s,it){ return s + (it.q||0)*(it.c||0); }, 0);
-      var custoNormal = normalItens.reduce(function(s,it){ return s + (it.q||0)*(it.c||0); }, 0);
-      var pctAvaria = custoNormal ? (custoAvaria / custoNormal * 100) : (custoAvaria ? null : 0);
-      cards.appendChild(makeCard('Itens em avaria', avariaItens.length, avariaItens.length > 0));
-      cards.appendChild(makeCard('Avaria (custo) vs normal', pctAvaria === null ? '-' : pctAvaria.toFixed(1) + '%', avariaItens.length > 0));
-    }
+    /* Avaria calculada sobre a mesma lista ja filtrada (faixas de dias,
+       status, estoque) - antes usava baseFiltered() (so filial+busca),
+       entao "Itens em avaria" contava avarias de fora do filtro aplicado
+       (ex: aparecia maior que o total de itens vencidos ao filtrar so
+       "Vencido"). */
+    var avariaItens = list.filter(isAvaria);
+    var normalItens = list.filter(function(it){ return !isAvaria(it); });
+    var custoAvaria = avariaItens.reduce(function(s,it){ return s + (it.q||0)*(it.c||0); }, 0);
+    var custoNormal = normalItens.reduce(function(s,it){ return s + (it.q||0)*(it.c||0); }, 0);
+    var pctAvaria = custoNormal ? (custoAvaria / custoNormal * 100) : (custoAvaria ? null : 0);
+    cards.appendChild(makeCard('Itens em avaria', avariaItens.length, avariaItens.length > 0));
+    cards.appendChild(makeCard('Avaria (custo) vs normal', pctAvaria === null ? '-' : pctAvaria.toFixed(1) + '%', avariaItens.length > 0));
   }
   function makeCard(label, value, crit){
     var div = document.createElement('div'); div.className = 'card' + (crit ? ' crit' : '');

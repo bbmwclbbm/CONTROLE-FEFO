@@ -173,7 +173,6 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
 .print-table th, .print-table td{border:1px solid var(--border-strong);padding:3px 6px;text-align:left;color:var(--text);}
 .print-table th{background:var(--surface-2);font-weight:600;}
 .print-table tr.group-header td{background:#1f4e78;color:#fff;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
-.print-table tr.group-subtotal td{background:#cfe0f2;color:#0c2c45;font-weight:700;font-size:11.5px;}
 .print-table td.num{text-align:right;font-variant-numeric:tabular-nums;}
 .print-table tr.band-vencido{background:var(--band-critico);}
 .print-table tr.band-b0{background:var(--band-b0);}
@@ -1159,15 +1158,14 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     var tbody = document.createElement('tbody');
     var sumCusto = 0, sumVenda = 0, hasVenda = false;
     var groupStats = {
-      vigor: calcGroupStats(list.filter(isVigor)),
-      outros: calcGroupStats(list.filter(function(it){ return !isVigor(it); }))
+      vigor: calcGroupTotals(list.filter(isVigor)),
+      outros: calcGroupTotals(list.filter(function(it){ return !isVigor(it); }))
     };
     var lastGroup = null;
     list.forEach(function(it){
       var group = isVigor(it) ? 'vigor' : 'outros';
       if(group !== lastGroup){
-        tbody.appendChild(groupHeaderRow(group === 'vigor' ? 'VIGOR' : 'OUTROS ITENS', 13));
-        tbody.appendChild(groupSubtotalRow(groupStats[group], 13));
+        tbody.appendChild(groupTotalsRow(group === 'vigor' ? 'VIGOR' : 'OUTROS ITENS', groupStats[group]));
         lastGroup = group;
       }
       var tr = document.createElement('tr'); tr.className = 'band-' + bandKey(it.d);
@@ -1235,35 +1233,33 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     return {vigor: list.filter(isVigor), outros: list.filter(function(it){ return !isVigor(it); })};
   }
 
-  /* Soma custo/venda do grupo (Vigor ou Outros) separado em "ja vencido"
-     (dias a vencer < 0) e "a vencer" (0 ou mais) - usado no subtotal do
-     PDF, pra saber de cara quanto em R$ ja venceu e quanto ainda vai
-     vencer dentro do filtro aplicado. */
-  function calcGroupStats(items){
-    var s = {
-      vencidoCount:0, vencidoCusto:0, vencidoVenda:0, vencidoHasVenda:false,
-      avencerCount:0, avencerCusto:0, avencerVenda:0, avencerHasVenda:false
-    };
+  /* Soma custo/venda/markup do grupo (Vigor ou Outros) - usado no PDF pra
+     mostrar o total de cada grupo alinhado nas mesmas colunas do total
+     geral, em vez de uma frase solta. */
+  function calcGroupTotals(items){
+    var sumCusto = 0, sumVenda = 0, hasVenda = false;
     items.forEach(function(it){
       var totalCusto = (it.q || 0) * (it.c || 0);
       var totalVenda = (it.s !== null && it.s !== undefined) ? (it.q || 0) * it.s : null;
-      var vencido = it.d !== null && it.d !== undefined && it.d < 0;
-      var bucket = vencido ? 'vencido' : 'avencer';
-      s[bucket + 'Count']++;
-      s[bucket + 'Custo'] += totalCusto;
-      if(totalVenda !== null){ s[bucket + 'Venda'] += totalVenda; s[bucket + 'HasVenda'] = true; }
+      sumCusto += totalCusto;
+      if(totalVenda !== null){ sumVenda += totalVenda; hasVenda = true; }
     });
-    return s;
+    var markup = (hasVenda && sumCusto) ? ((sumVenda - sumCusto) / sumCusto * 100) : null;
+    return {count: items.length, custo: sumCusto, venda: sumVenda, hasVenda: hasVenda, markup: markup};
   }
-  function groupSubtotalRow(s, colspan){
-    var tr = document.createElement('tr'); tr.className = 'group-subtotal';
-    var td = document.createElement('td'); td.colSpan = colspan;
-    td.textContent =
-      'Ja vencido: ' + s.vencidoCount + ' item(ns) - Custo ' + fmtMoney(s.vencidoCusto) +
-      ' - Venda ' + (s.vencidoHasVenda ? fmtMoney(s.vencidoVenda) : '-') +
-      '   |   A vencer: ' + s.avencerCount + ' item(ns) - Custo ' + fmtMoney(s.avencerCusto) +
-      ' - Venda ' + (s.avencerHasVenda ? fmtMoney(s.avencerVenda) : '-');
-    tr.appendChild(td);
+  /* Linha de cabecalho do grupo no PDF: nome + quantidade de itens de um
+     lado, e total custo/venda/markup do grupo alinhados nas mesmas
+     colunas "Total custo (R$)"/"Total venda (R$)"/"Markup %" da tabela -
+     igual ao rodape "Totais (itens filtrados)" ja usado la embaixo. */
+  function groupTotalsRow(label, stats){
+    var tr = document.createElement('tr'); tr.className = 'group-header';
+    var tdLabel = document.createElement('td'); tdLabel.colSpan = 10;
+    tdLabel.textContent = label + ' (' + stats.count + ' item(ns))';
+    tr.appendChild(tdLabel);
+    var tdCusto = document.createElement('td'); tdCusto.className = 'num'; tdCusto.textContent = fmtMoney(stats.custo);
+    var tdVenda = document.createElement('td'); tdVenda.className = 'num'; tdVenda.textContent = stats.hasVenda ? fmtMoney(stats.venda) : '-';
+    var tdMarkup = document.createElement('td'); tdMarkup.className = 'num'; tdMarkup.textContent = stats.markup === null ? '-' : stats.markup.toFixed(1) + '%';
+    tr.appendChild(tdCusto); tr.appendChild(tdVenda); tr.appendChild(tdMarkup);
     return tr;
   }
 

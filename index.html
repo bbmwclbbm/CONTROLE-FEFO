@@ -160,9 +160,14 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
 .modal-box textarea{margin-bottom:12px;}
 .print-only{display:none;}
 .print-table{width:100%;border-collapse:collapse;font-size:11px;}
-.print-table th, .print-table td{border:1px solid #999;padding:3px 6px;text-align:left;}
-.print-table th{background:#eee;}
+.print-table th, .print-table td{border:1px solid var(--border-strong);padding:3px 6px;text-align:left;color:var(--text);}
+.print-table th{background:var(--surface-2);font-weight:600;}
 .print-table td.num{text-align:right;font-variant-numeric:tabular-nums;}
+.print-table tr.band-vencido, .print-table tr.band-b0{background:var(--band-critico);}
+.print-table tr.band-b1{background:var(--band-b1);}
+.print-table tr.band-b2{background:var(--band-b2);}
+.print-table tr.band-b3{background:var(--band-b3);}
+.print-table tr.band-b4{background:var(--band-b4);}
 @media print{
   @page{ size: landscape; margin: 12mm; }
   body{ background:#fff; }
@@ -201,7 +206,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     <button id="btnAutoReload">Atualizar do repositorio</button>
     <button id="btnAdd">+ Novo item</button>
     <button id="btnPaste">Colar dados</button>
-    <button id="btnPrint">Imprimir relatorio</button>
+    <button id="btnPrint">Exportar PDF</button>
     <button id="btnExportCsv">Exportar CSV</button>
     <button id="btnBackup">Backup (JSON)</button>
     <button id="btnRestore">Restaurar backup</button>
@@ -729,6 +734,18 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     return 'R$ ' + n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
   }
 
+  /* Numeros em pt-BR usam virgula como separador decimal e ponto como
+     separador de milhar - o oposto do padrao JS. Sem isso, 24.332 (vinte e
+     quatro virgula trezentos e trinta e dois) aparecia como se fosse vinte
+     e quatro mil e trezentos e trinta e dois. Usado no relatorio em PDF,
+     que exibe texto puro (ao contrario da tabela principal, que usa
+     <input type=number> - esses sempre mostram ponto, e isso e esperado
+     em campo editavel). */
+  function fmtQty(n){
+    if(n === null || n === undefined || isNaN(n)) return '-';
+    return n.toLocaleString('pt-BR', {maximumFractionDigits:3});
+  }
+
   function baseFiltered(){
     var filFilial = document.getElementById('filFilial').value;
     var busca = document.getElementById('filBusca').value.trim().toLowerCase();
@@ -1126,13 +1143,13 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       tr.appendChild(td(it.p));
       tr.appendChild(td(it.f ? 'Filial ' + it.f : '-'));
       tr.appendChild(td(it.u || '-'));
-      tr.appendChild(td(it.q === null || it.q === undefined ? '-' : it.q, true));
-      tr.appendChild(td(it.bloq ? it.bloq : '-', true));
-      tr.appendChild(td(it.pend ? it.pend : '-', true));
+      tr.appendChild(td(fmtQty(it.q), true));
+      tr.appendChild(td(it.bloq ? fmtQty(it.bloq) : '-', true));
+      tr.appendChild(td(it.pend ? fmtQty(it.pend) : '-', true));
       tr.appendChild(td(it.d === null || it.d === undefined ? '-' : it.d, true));
       tr.appendChild(td(it.v || '-'));
-      tr.appendChild(td(it.c === null || it.c === undefined ? '-' : it.c, true));
-      tr.appendChild(td(it.s === null || it.s === undefined ? '-' : it.s, true));
+      tr.appendChild(td(it.c === null || it.c === undefined ? '-' : fmtMoney(it.c), true));
+      tr.appendChild(td(it.s === null || it.s === undefined ? '-' : fmtMoney(it.s), true));
       tr.appendChild(td(fmtMoney(totalCusto), true));
       tr.appendChild(td(totalVenda === null ? '-' : fmtMoney(totalVenda), true));
       tr.appendChild(td(markup === null ? '-' : markup.toFixed(1) + '%', true));

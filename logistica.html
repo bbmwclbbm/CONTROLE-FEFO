@@ -88,6 +88,7 @@ td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:middle;}
 tr:last-child td{border-bottom:none;}
 td.produto{max-width:360px;}
 td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+th#thDias, td.dias-col{text-align:center;}
 .band-vencido{background:var(--band-critico);}
 .band-b0{background:var(--band-b0);}
 .band-b1{background:var(--band-b1);}
@@ -126,6 +127,7 @@ td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
 .print-table th, .print-table td{border:1px solid var(--border-strong);padding:3px 6px;text-align:left;color:var(--text);}
 .print-table th{background:var(--surface-2);font-weight:600;}
 .print-table td.num{text-align:right;font-variant-numeric:tabular-nums;}
+.print-table td.dias-col{text-align:center;}
 .print-table tr.band-vencido{background:var(--band-critico);}
 .print-table tr.band-b0{background:var(--band-b0);}
 .print-table tr.band-b1{background:var(--band-b1);}
@@ -417,7 +419,7 @@ td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
       tr.appendChild(td(fmtQty(it.q), 'num'));
       tr.appendChild(td(it.bloq ? fmtQty(it.bloq) : '-', 'num'));
       tr.appendChild(td(it.pend ? fmtQty(it.pend) : '-', 'num'));
-      tr.appendChild(td(it.d === null || it.d === undefined ? '-' : it.d, 'num'));
+      tr.appendChild(td(it.d === null || it.d === undefined ? '-' : it.d, 'num dias-col'));
       tr.appendChild(td(it.v || '-'));
       tr.appendChild(td(it.s === null || it.s === undefined ? '-' : fmtMoney(it.s), 'num'));
       tbody.appendChild(tr);
@@ -521,14 +523,14 @@ td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
     var tbody = document.createElement('tbody');
     list.forEach(function(it){
       var tr = document.createElement('tr'); tr.className = 'band-' + bandKey(it.d);
-      function td(text, num){ var d = document.createElement('td'); if(num) d.className = 'num'; d.textContent = text; return d; }
+      function td(text, num, cls){ var d = document.createElement('td'); if(num) d.className = cls ? 'num ' + cls : 'num'; d.textContent = text; return d; }
       tr.appendChild(td(it.p));
       tr.appendChild(td(it.f ? 'Filial ' + it.f : '-'));
       tr.appendChild(td(it.u || '-'));
       tr.appendChild(td(fmtQty(it.q), true));
       tr.appendChild(td(it.bloq ? fmtQty(it.bloq) : '-', true));
       tr.appendChild(td(it.pend ? fmtQty(it.pend) : '-', true));
-      tr.appendChild(td(it.d === null || it.d === undefined ? '-' : it.d, true));
+      tr.appendChild(td(it.d === null || it.d === undefined ? '-' : it.d, true, 'dias-col'));
       tr.appendChild(td(it.v || '-'));
       tbody.appendChild(tr);
     });

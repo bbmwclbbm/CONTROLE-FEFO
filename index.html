@@ -1191,16 +1191,29 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     try{ return await window.claude.use('downloads'); }catch(e){ return null; }
   }
 
+  /* Agrupa os itens Vigor separados dos demais no export - produto contem
+     o fornecedor no fim da descricao (ex: "... VIGOR"). */
+  function isVigor(it){ return /\bVIGOR\b/i.test(it.p); }
+  function splitVigor(list){
+    return {vigor: list.filter(isVigor), outros: list.filter(function(it){ return !isVigor(it); })};
+  }
+
   document.getElementById('btnExportCsv').addEventListener('click', async function(){
     var header = ['Produto','Filial','Un','Qtd','Dias a vencer','Validade','Custo +ICMS','Preço venda','Total custo','Total venda','Markup %'];
-    var rows = [header.join(';')];
-    getFiltered().forEach(function(it){
+    var rowOf = function(it){
       var totalCusto = (it.q||0)*(it.c||0);
       var totalVenda = (it.s !== null && it.s !== undefined) ? (it.q||0)*it.s : '';
       var temPreco = (it.s !== null && it.s !== undefined && it.c);
       var markup = temPreco ? ((it.s-it.c)/it.c*100).toFixed(1) : '';
-      rows.push([it.p, it.f, it.u, it.q, it.d, it.v, it.c, it.s === null ? '' : it.s, totalCusto.toFixed(2), totalVenda === '' ? '' : totalVenda.toFixed(2), markup].join(';'));
-    });
+      return [it.p, it.f, it.u, it.q, it.d, it.v, it.c, it.s === null ? '' : it.s, totalCusto.toFixed(2), totalVenda === '' ? '' : totalVenda.toFixed(2), markup].join(';');
+    };
+    var groups = splitVigor(getFiltered());
+    var rows = [header.join(';')];
+    rows.push('VIGOR (' + groups.vigor.length + ' item(ns))');
+    groups.vigor.forEach(function(it){ rows.push(rowOf(it)); });
+    rows.push('');
+    rows.push('OUTROS ITENS (' + groups.outros.length + ' item(ns))');
+    groups.outros.forEach(function(it){ rows.push(rowOf(it)); });
     var csv = rows.join('\n');
     var downloads = await getDownloads();
     if(downloads){

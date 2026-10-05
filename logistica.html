@@ -87,6 +87,8 @@ th{
 td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:middle;}
 tr:last-child td{border-bottom:none;}
 td.produto{max-width:360px;}
+tr.group-header td{background:var(--surface-2);color:var(--text-secondary);font-weight:700;
+  font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;padding:6px 8px;}
 td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
 th#thDias, td.dias-col{text-align:center;}
 .band-vencido{background:var(--band-critico);}
@@ -126,6 +128,7 @@ th#thDias, td.dias-col{text-align:center;}
 .print-table{width:100%;border-collapse:collapse;font-size:11px;}
 .print-table th, .print-table td{border:1px solid var(--border-strong);padding:3px 6px;text-align:left;color:var(--text);}
 .print-table th{background:var(--surface-2);font-weight:600;}
+.print-table tr.group-header td{background:#ddd;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
 .print-table td.num{text-align:right;font-variant-numeric:tabular-nums;}
 .print-table td.dias-col{text-align:center;}
 .print-table tr.band-vencido{background:var(--band-critico);}
@@ -360,7 +363,13 @@ th#thDias, td.dias-col{text-align:center;}
       if(!matchesEstoqueFilter(it)) return false;
       return true;
     });
+    /* Agrupa Vigor separado dos demais (pedido da logistica: os itens Vigor
+       nao devem ficar misturados com o resto, nem na tela nem no PDF) -
+       dentro de cada grupo mantem a ordenacao por dias a vencer. */
     list.sort(function(a,b){
+      var va = isVigor(a) ? 0 : 1;
+      var vb = isVigor(b) ? 0 : 1;
+      if(va !== vb) return va - vb;
       var da = (a.d === null || a.d === undefined) ? 9999 : a.d;
       var db = (b.d === null || b.d === undefined) ? 9999 : b.d;
       return sortAsc ? da - db : db - da;
@@ -409,7 +418,13 @@ th#thDias, td.dias-col{text-align:center;}
       td.textContent = 'Nenhum item nessa selecao. Ajuste os filtros de dias a vencer, filial, status ou busca.';
       tr.appendChild(td); tbody.appendChild(tr);
     }
+    var lastGroup = null;
     list.forEach(function(it){
+      var group = isVigor(it) ? 'vigor' : 'outros';
+      if(group !== lastGroup){
+        tbody.appendChild(groupHeaderRow(group === 'vigor' ? 'VIGOR' : 'OUTROS ITENS', 9));
+        lastGroup = group;
+      }
       var tr = document.createElement('tr');
       tr.className = 'band-' + bandKey(it.d);
       function td(text, cls){ var d = document.createElement('td'); if(cls) d.className = cls; d.textContent = text; return d; }
@@ -461,11 +476,18 @@ th#thDias, td.dias-col{text-align:center;}
     try{ return await window.claude.use('downloads'); }catch(e){ return null; }
   }
 
-  /* Agrupa os itens Vigor separados dos demais no export - produto contem
-     o fornecedor no fim da descricao (ex: "... VIGOR"). */
+  /* Agrupa os itens Vigor separados dos demais - produto contem o
+     fornecedor no fim da descricao (ex: "... VIGOR"). Usado pra ordenar
+     a lista (getFiltered), pra marcar a secao na tela/PDF e no export. */
   function isVigor(it){ return /\bVIGOR\b/i.test(it.p); }
   function splitVigor(list){
     return {vigor: list.filter(isVigor), outros: list.filter(function(it){ return !isVigor(it); })};
+  }
+  function groupHeaderRow(label, colspan){
+    var tr = document.createElement('tr'); tr.className = 'group-header';
+    var td = document.createElement('td'); td.colSpan = colspan; td.textContent = label;
+    tr.appendChild(td);
+    return tr;
   }
 
   document.getElementById('btnExportCsv').addEventListener('click', async function(){
@@ -532,7 +554,13 @@ th#thDias, td.dias-col{text-align:center;}
     thead.appendChild(trh); table.appendChild(thead);
 
     var tbody = document.createElement('tbody');
+    var lastGroup = null;
     list.forEach(function(it){
+      var group = isVigor(it) ? 'vigor' : 'outros';
+      if(group !== lastGroup){
+        tbody.appendChild(groupHeaderRow(group === 'vigor' ? 'VIGOR' : 'OUTROS ITENS', 8));
+        lastGroup = group;
+      }
       var tr = document.createElement('tr'); tr.className = 'band-' + bandKey(it.d);
       function td(text, num, cls){ var d = document.createElement('td'); if(num) d.className = cls ? 'num ' + cls : 'num'; d.textContent = text; return d; }
       tr.appendChild(td(it.p));

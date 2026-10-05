@@ -89,6 +89,8 @@ th{
 }
 td{padding:5px 8px;border-bottom:1px solid var(--border);vertical-align:middle;}
 tr:last-child td{border-bottom:none;}
+tr.group-header td{background:var(--surface-2);color:var(--text-secondary);font-weight:700;
+  font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;padding:6px 8px;}
 td input, td select{
   width:100%;background:transparent;border:1px solid transparent;border-radius:6px;color:var(--text);
   font-size:13px;padding:5px 6px;
@@ -167,6 +169,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
 .print-table{width:100%;border-collapse:collapse;font-size:11px;}
 .print-table th, .print-table td{border:1px solid var(--border-strong);padding:3px 6px;text-align:left;color:var(--text);}
 .print-table th{background:var(--surface-2);font-weight:600;}
+.print-table tr.group-header td{background:#ddd;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
 .print-table td.num{text-align:right;font-variant-numeric:tabular-nums;}
 .print-table tr.band-vencido{background:var(--band-critico);}
 .print-table tr.band-b0{background:var(--band-b0);}
@@ -782,7 +785,13 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       if(!matchesEstoqueFilter(it)) return false;
       return true;
     });
+    /* Agrupa Vigor separado dos demais (nao misturado com o resto, nem na
+       tela nem no PDF) - dentro de cada grupo mantem a ordenacao por dias
+       a vencer. */
     list.sort(function(a,b){
+      var va = isVigor(a) ? 0 : 1;
+      var vb = isVigor(b) ? 0 : 1;
+      if(va !== vb) return va - vb;
       var da = (a.d === null || a.d === undefined) ? 9999 : a.d;
       var db = (b.d === null || b.d === undefined) ? 9999 : b.d;
       return sortAsc ? da - db : db - da;
@@ -879,7 +888,13 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       tr.appendChild(td); tbody.appendChild(tr);
     }
     var sumCusto = 0, sumVenda = 0, hasVenda = false;
+    var lastGroup = null;
     list.forEach(function(it){
+      var group = isVigor(it) ? 'vigor' : 'outros';
+      if(group !== lastGroup){
+        tbody.appendChild(groupHeaderRow(group === 'vigor' ? 'VIGOR' : 'OUTROS ITENS', 14));
+        lastGroup = group;
+      }
       var tr = document.createElement('tr');
       tr.className = 'band-' + bandKey(it.d);
       tr.dataset.id = it._id;
@@ -1139,7 +1154,13 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
 
     var tbody = document.createElement('tbody');
     var sumCusto = 0, sumVenda = 0, hasVenda = false;
+    var lastGroup = null;
     list.forEach(function(it){
+      var group = isVigor(it) ? 'vigor' : 'outros';
+      if(group !== lastGroup){
+        tbody.appendChild(groupHeaderRow(group === 'vigor' ? 'VIGOR' : 'OUTROS ITENS', 13));
+        lastGroup = group;
+      }
       var tr = document.createElement('tr'); tr.className = 'band-' + bandKey(it.d);
       function td(text, num){ var d = document.createElement('td'); if(num) d.className = 'num'; d.textContent = text; return d; }
       var totalCusto = (it.q || 0) * (it.c || 0);
@@ -1191,9 +1212,16 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     try{ return await window.claude.use('downloads'); }catch(e){ return null; }
   }
 
-  /* Agrupa os itens Vigor separados dos demais no export - produto contem
-     o fornecedor no fim da descricao (ex: "... VIGOR"). */
+  /* Agrupa os itens Vigor separados dos demais - produto contem o
+     fornecedor no fim da descricao (ex: "... VIGOR"). Usado pra ordenar a
+     lista (getFiltered), marcar a secao na tela/PDF e no export. */
   function isVigor(it){ return /\bVIGOR\b/i.test(it.p); }
+  function groupHeaderRow(label, colspan){
+    var tr = document.createElement('tr'); tr.className = 'group-header';
+    var td = document.createElement('td'); td.colSpan = colspan; td.textContent = label;
+    tr.appendChild(td);
+    return tr;
+  }
   function splitVigor(list){
     return {vigor: list.filter(isVigor), outros: list.filter(function(it){ return !isVigor(it); })};
   }

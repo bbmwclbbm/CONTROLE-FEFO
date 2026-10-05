@@ -316,6 +316,15 @@ td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
     return 'R$ ' + n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
   }
 
+  /* Numeros em pt-BR usam virgula como separador decimal e ponto como
+     separador de milhar - o oposto do padrao JS. Sem isso, 24.332 (vinte e
+     quatro virgula trezentos e trinta e dois) aparecia como se fosse vinte
+     e quatro mil e trezentos e trinta e dois. */
+  function fmtQty(n){
+    if(n === null || n === undefined || isNaN(n)) return '-';
+    return n.toLocaleString('pt-BR', {maximumFractionDigits:3});
+  }
+
   function matchesEstoqueFilter(it){
     var v = document.getElementById('filEstoque').value;
     if(v === 'bloqueado') return it.bloq > 0;
@@ -399,9 +408,9 @@ td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
       tr.appendChild(td(it.p, 'produto'));
       tr.appendChild(td(it.f ? 'Filial ' + it.f : '-'));
       tr.appendChild(td(it.u || '-'));
-      tr.appendChild(td(it.q === null || it.q === undefined ? '-' : it.q, 'num'));
-      tr.appendChild(td(it.bloq ? it.bloq : '-', 'num'));
-      tr.appendChild(td(it.pend ? it.pend : '-', 'num'));
+      tr.appendChild(td(fmtQty(it.q), 'num'));
+      tr.appendChild(td(it.bloq ? fmtQty(it.bloq) : '-', 'num'));
+      tr.appendChild(td(it.pend ? fmtQty(it.pend) : '-', 'num'));
       tr.appendChild(td(it.d === null || it.d === undefined ? '-' : it.d, 'num'));
       tr.appendChild(td(it.v || '-'));
       tr.appendChild(td(it.s === null || it.s === undefined ? '-' : fmtMoney(it.s), 'num'));
@@ -510,9 +519,9 @@ td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
       tr.appendChild(td(it.p));
       tr.appendChild(td(it.f ? 'Filial ' + it.f : '-'));
       tr.appendChild(td(it.u || '-'));
-      tr.appendChild(td(it.q === null || it.q === undefined ? '-' : it.q, true));
-      tr.appendChild(td(it.bloq ? it.bloq : '-', true));
-      tr.appendChild(td(it.pend ? it.pend : '-', true));
+      tr.appendChild(td(fmtQty(it.q), true));
+      tr.appendChild(td(it.bloq ? fmtQty(it.bloq) : '-', true));
+      tr.appendChild(td(it.pend ? fmtQty(it.pend) : '-', true));
       tr.appendChild(td(it.d === null || it.d === undefined ? '-' : it.d, true));
       tr.appendChild(td(it.v || '-'));
       tbody.appendChild(tr);

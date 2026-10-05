@@ -170,6 +170,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
 .print-table th, .print-table td{border:1px solid var(--border-strong);padding:3px 6px;text-align:left;color:var(--text);}
 .print-table th{background:var(--surface-2);font-weight:600;}
 .print-table tr.group-header td{background:#1f4e78;color:#fff;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
+.print-table tr.group-subtotal td{background:#eef4fa;font-weight:600;font-style:italic;}
 .print-table td.num{text-align:right;font-variant-numeric:tabular-nums;}
 .print-table tr.band-vencido{background:var(--band-critico);}
 .print-table tr.band-b0{background:var(--band-b0);}
@@ -1154,11 +1155,16 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
 
     var tbody = document.createElement('tbody');
     var sumCusto = 0, sumVenda = 0, hasVenda = false;
+    var groupStats = {
+      vigor: calcGroupStats(list.filter(isVigor)),
+      outros: calcGroupStats(list.filter(function(it){ return !isVigor(it); }))
+    };
     var lastGroup = null;
     list.forEach(function(it){
       var group = isVigor(it) ? 'vigor' : 'outros';
       if(group !== lastGroup){
         tbody.appendChild(groupHeaderRow(group === 'vigor' ? 'VIGOR' : 'OUTROS ITENS', 13));
+        tbody.appendChild(groupSubtotalRow(groupStats[group], 13));
         lastGroup = group;
       }
       var tr = document.createElement('tr'); tr.className = 'band-' + bandKey(it.d);
@@ -1224,6 +1230,38 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   }
   function splitVigor(list){
     return {vigor: list.filter(isVigor), outros: list.filter(function(it){ return !isVigor(it); })};
+  }
+
+  /* Soma custo/venda do grupo (Vigor ou Outros) separado em "ja vencido"
+     (dias a vencer < 0) e "a vencer" (0 ou mais) - usado no subtotal do
+     PDF, pra saber de cara quanto em R$ ja venceu e quanto ainda vai
+     vencer dentro do filtro aplicado. */
+  function calcGroupStats(items){
+    var s = {
+      vencidoCount:0, vencidoCusto:0, vencidoVenda:0, vencidoHasVenda:false,
+      avencerCount:0, avencerCusto:0, avencerVenda:0, avencerHasVenda:false
+    };
+    items.forEach(function(it){
+      var totalCusto = (it.q || 0) * (it.c || 0);
+      var totalVenda = (it.s !== null && it.s !== undefined) ? (it.q || 0) * it.s : null;
+      var vencido = it.d !== null && it.d !== undefined && it.d < 0;
+      var bucket = vencido ? 'vencido' : 'avencer';
+      s[bucket + 'Count']++;
+      s[bucket + 'Custo'] += totalCusto;
+      if(totalVenda !== null){ s[bucket + 'Venda'] += totalVenda; s[bucket + 'HasVenda'] = true; }
+    });
+    return s;
+  }
+  function groupSubtotalRow(s, colspan){
+    var tr = document.createElement('tr'); tr.className = 'group-subtotal';
+    var td = document.createElement('td'); td.colSpan = colspan;
+    td.textContent =
+      'Ja vencido: ' + s.vencidoCount + ' item(ns) - Custo ' + fmtMoney(s.vencidoCusto) +
+      ' - Venda ' + (s.vencidoHasVenda ? fmtMoney(s.vencidoVenda) : '-') +
+      '   |   A vencer: ' + s.avencerCount + ' item(ns) - Custo ' + fmtMoney(s.avencerCusto) +
+      ' - Venda ' + (s.avencerHasVenda ? fmtMoney(s.avencerVenda) : '-');
+    tr.appendChild(td);
+    return tr;
   }
 
   document.getElementById('btnExportCsv').addEventListener('click', async function(){

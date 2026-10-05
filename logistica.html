@@ -757,25 +757,36 @@ th#thDias, td.dias-col{text-align:center;}
     });
   }
 
+  /* A 1707 lista uma linha por lote/endereco - o mesmo codigo de produto
+     aparece varias vezes com quantidade/validade diferentes. Por isso nao
+     da pra "achar o item existente e atualizar": isso so atualizava a
+     primeira linha daquele codigo repetidas vezes e deixava as outras
+     linhas antigas (de outros lotes) paradas com dado velho, inflando a
+     contagem de vencidos. Em vez disso, refaz do zero os itens dessa
+     filial (um item por linha da 1707, igual ao cruzamento automatico),
+     reaproveitando preco/unidade/bloqueado/pendente que ja estavam
+     carregados pra cada codigo. */
   function mergeManual1707(rows, filial){
-    var updated = 0, added = 0;
+    var priceByCode = {};
+    items.forEach(function(it){
+      var code = it.p.split(' - ')[0].trim();
+      if(!priceByCode[code] || String(it.f) === String(filial)){
+        priceByCode[code] = {u: it.u, s: it.s, bloq: it.bloq, pend: it.pend};
+      }
+    });
+    items = items.filter(function(it){ return String(it.f) !== String(filial); });
+    var total = 0, semPreco = 0;
     rows.forEach(function(row){
       var parsed = parse1707Row(row);
       if(!parsed) return;
-      var existing = items.find(function(it){
-        var code = it.p.split(' - ')[0].trim();
-        return code === parsed.code && String(it.f) === String(filial);
-      });
-      if(existing){
-        existing.q = parsed.qtd; existing.d = parsed.dias; existing.v = parsed.valid; existing.st = parsed.status;
-        updated++;
-      } else {
-        items.push({p: parsed.code + ' - ' + parsed.desc, f: filial, u: 'KG', q: parsed.qtd, d: parsed.dias,
-          v: parsed.valid, s: null, st: parsed.status, bloq: null, pend: null});
-        added++;
-      }
+      var price = priceByCode[parsed.code];
+      if(!price || price.s === null || price.s === undefined) semPreco++;
+      items.push({p: parsed.code + ' - ' + parsed.desc, f: filial, u: (price && price.u) || 'KG',
+        q: parsed.qtd, d: parsed.dias, v: parsed.valid, s: price ? price.s : null, st: parsed.status,
+        bloq: price ? price.bloq : null, pend: price ? price.pend : null});
+      total++;
     });
-    return {updated: updated, added: added};
+    return {total: total, semPreco: semPreco};
   }
 
   document.getElementById('btnToggleImport').addEventListener('click', function(){
@@ -798,18 +809,18 @@ th#thDias, td.dias-col{text-align:center;}
     if(f1) jobs.push(readFileAsRows(f1).then(function(rows){ return {rows: rows, filial: '1'}; }));
     if(f3) jobs.push(readFileAsRows(f3).then(function(rows){ return {rows: rows, filial: '3'}; }));
     Promise.all(jobs).then(function(results){
-      var totalUpdated = 0, totalAdded = 0;
+      var total = 0, semPreco = 0;
       results.forEach(function(r){
         if(!looksLike1707(r.rows)){ return; }
         var res = mergeManual1707(r.rows, r.filial);
-        totalUpdated += res.updated; totalAdded += res.added;
+        total += res.total; semPreco += res.semPreco;
       });
       render();
       var now = new Date();
       var banner = document.getElementById('manualImportBanner');
       banner.textContent = 'Importacao manual as ' + pad2(now.getHours()) + ':' + pad2(now.getMinutes()) +
-        ' - ' + totalUpdated + ' item(ns) atualizado(s), ' + totalAdded + ' novo(s). Preco de tabela nao foi alterado. ' +
-        '(Valido so para esta visita - some ao recarregar a pagina.)';
+        ' - ' + total + ' item(ns) atualizado(s)' + (semPreco ? ', ' + semPreco + ' sem preco cadastrado ainda' : '') +
+        '. Preco de tabela nao foi alterado. (Valido so para esta visita - some ao recarregar a pagina.)';
       msg.textContent = 'Pronto. Tabela atualizada abaixo.';
       document.getElementById('fileFefo1').value = '';
       document.getElementById('fileFefo3').value = '';

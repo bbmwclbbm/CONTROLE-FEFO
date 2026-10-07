@@ -105,6 +105,7 @@ button.produto-view{display:block;width:100%;max-width:240px;text-align:left;bac
   border:1px solid transparent;border-radius:6px;color:var(--text);font-size:13px;padding:5px 6px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;}
 button.produto-view:hover{border-color:var(--border-strong);background:var(--surface-2);}
+td.num{text-align:right;font-variant-numeric:tabular-nums;}
 td.num input{text-align:right;width:80px;}
 td.readonly{text-align:right;color:var(--text-secondary);white-space:nowrap;font-variant-numeric:tabular-nums;}
 td.rm{text-align:center;}
@@ -891,11 +892,15 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       tr.appendChild(td); tbody.appendChild(tr);
     }
     var sumCusto = 0, sumVenda = 0, hasVenda = false;
+    var groupStats = {
+      vigor: calcGroupTotals(list.filter(isVigor)),
+      outros: calcGroupTotals(list.filter(function(it){ return !isVigor(it); }))
+    };
     var lastGroup = null;
     list.forEach(function(it){
       var group = isVigor(it) ? 'vigor' : 'outros';
       if(group !== lastGroup){
-        tbody.appendChild(groupHeaderRow(group === 'vigor' ? 'VIGOR' : 'OUTROS ITENS', 14));
+        tbody.appendChild(groupTotalsRowScreen(group === 'vigor' ? 'VIGOR' : 'OUTROS ITENS', groupStats[group]));
         lastGroup = group;
       }
       var tr = document.createElement('tr');
@@ -1223,12 +1228,6 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
      fornecedor no fim da descricao (ex: "... VIGOR"). Usado pra ordenar a
      lista (getFiltered), marcar a secao na tela/PDF e no export. */
   function isVigor(it){ return /\bVIGOR\b/i.test(it.p); }
-  function groupHeaderRow(label, colspan){
-    var tr = document.createElement('tr'); tr.className = 'group-header';
-    var td = document.createElement('td'); td.colSpan = colspan; td.textContent = label;
-    tr.appendChild(td);
-    return tr;
-  }
   function splitVigor(list){
     return {vigor: list.filter(isVigor), outros: list.filter(function(it){ return !isVigor(it); })};
   }
@@ -1260,6 +1259,15 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     var tdVenda = document.createElement('td'); tdVenda.className = 'num'; tdVenda.textContent = stats.hasVenda ? fmtMoney(stats.venda) : '-';
     var tdMarkup = document.createElement('td'); tdMarkup.className = 'num'; tdMarkup.textContent = stats.markup === null ? '-' : stats.markup.toFixed(1) + '%';
     tr.appendChild(tdCusto); tr.appendChild(tdVenda); tr.appendChild(tdMarkup);
+    return tr;
+  }
+  /* Mesma linha de totais do grupo, mas pra tabela principal na tela (tem
+     mais uma coluna no final, a do botao de remover, que fica em branco
+     aqui). Assim da pra ver o total da Vigor e dos outros itens direto na
+     pagina, sem precisar exportar o PDF. */
+  function groupTotalsRowScreen(label, stats){
+    var tr = groupTotalsRow(label, stats);
+    tr.appendChild(document.createElement('td'));
     return tr;
   }
 

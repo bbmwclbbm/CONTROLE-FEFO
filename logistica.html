@@ -243,7 +243,7 @@ th#thDias, td.dias-col{text-align:center;}
           <th>Filial</th>
           <th>Un.</th>
           <th>Disponivel</th>
-          <th>Saiu (ontem)</th>
+          <th>Vendido hoje</th>
           <th>Bloqueado</th>
           <th>Pendente</th>
           <th id="thDias" style="cursor:pointer">Dias a vencer &#8645;</th>
@@ -413,14 +413,18 @@ th#thDias, td.dias-col{text-align:center;}
     wrap.appendChild(btnNone);
   }
 
-  /* ---------------- "Saiu desde ontem" ----------------
-     Usa o proprio historico do GitHub: busca a versao da rotina 1707 do
-     ultimo dia anterior a hoje que foi enviada ao repositorio, soma a
-     quantidade de cada produto (por codigo+filial) nela, e compara com a
-     soma de hoje - assim todo mundo que abre o site ve o mesmo "saiu",
-     vindo do mesmo dado compartilhado, sem depender do navegador de cada
-     um. So mostra valor quando a quantidade diminuiu (reposicao nao conta
-     como "saiu"). Se o GitHub nao responder, a coluna so fica em branco. */
+  /* ---------------- "Vendido hoje" ----------------
+     O faturamento roda de madrugada (00h-7h), consumindo o estoque de
+     ontem pra gerar o estoque de hoje - entao a diferenca entre a
+     quantidade de ontem e a de hoje e exatamente o que foi vendido hoje
+     de manha. Usa o proprio historico do GitHub: busca a versao da
+     rotina 1707 do ultimo dia anterior a hoje que foi enviada ao
+     repositorio, soma a quantidade de cada produto (por codigo+filial)
+     nela, e compara com a soma de hoje - assim todo mundo que abre o
+     site ve o mesmo "vendido hoje", vindo do mesmo dado compartilhado,
+     sem depender do navegador de cada um. So mostra valor quando a
+     quantidade diminuiu (reposicao nao conta como venda). Se o GitHub
+     nao responder, a coluna so fica em branco. */
   var GH_OWNER = 'wesleyboibom', GH_REPO = 'CONTROLE-FEFO', GH_BRANCH = 'main';
   var YESTERDAY_SHA_CACHE_KEY = 'fefo_logistica_yesterday_sha_cache_v1';
 
@@ -613,7 +617,7 @@ th#thDias, td.dias-col{text-align:center;}
   }
 
   document.getElementById('btnExportCsv').addEventListener('click', async function(){
-    var header = ['Produto','Filial','Un','Disponivel','Saiu (ontem)','Bloqueado','Pendente','Dias a vencer','Validade','Preco tabela'];
+    var header = ['Produto','Filial','Un','Disponivel','Vendido hoje','Bloqueado','Pendente','Dias a vencer','Validade','Preco tabela'];
     var rowOf = function(it){
       var saiu = (it.saiu !== null && it.saiu !== undefined && it.saiu > 0) ? it.saiu : '';
       return [it.p, it.f, it.u, it.q, saiu, it.bloq || '', it.pend || '', it.d, it.v, it.s === null || it.s === undefined ? '' : it.s].join(';');
@@ -674,7 +678,7 @@ th#thDias, td.dias-col{text-align:center;}
     var list = getFiltered();
     var table = document.createElement('table'); table.className = 'print-table';
     var thead = document.createElement('thead'); var trh = document.createElement('tr');
-    ['Produto','Filial','Un.','Disponivel','Saiu (ontem)','Bloqueado','Pendente','Dias a vencer','Validade']
+    ['Produto','Filial','Un.','Disponivel','Vendido hoje','Bloqueado','Pendente','Dias a vencer','Validade']
       .forEach(function(txt){ var th = document.createElement('th'); th.textContent = txt; trh.appendChild(th); });
     thead.appendChild(trh); table.appendChild(thead);
 

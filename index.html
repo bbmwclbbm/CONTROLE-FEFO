@@ -346,7 +346,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
           <th>Filial</th>
           <th>Un.</th>
           <th>Disponivel</th>
-          <th>Saiu (ontem)</th>
+          <th>Vendido hoje</th>
           <th>Bloqueado</th>
           <th>Pendente</th>
           <th id="thDias" style="cursor:pointer">Dias a vencer &#8645;</th>
@@ -883,17 +883,21 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     wrap.innerHTML = html;
   }
 
-  /* ---------------- "Saiu desde ontem" ----------------
-     Em vez de guardar isso so no navegador de quem acessa, usa o proprio
-     historico do GitHub: o repositorio guarda cada versao anterior dos
-     arquivos "1707 f1.xls"/"1707 f3.xls" que ja foi enviada. Busca a
-     versao mais recente de um dia anterior a hoje, soma a quantidade de
-     cada produto (por codigo+filial) nela, e compara com a soma de hoje -
-     assim todo mundo que abre o site ve o mesmo "saiu", calculado a
-     partir do mesmo dado compartilhado, sem depender do navegador. So
-     mostra valor quando a quantidade diminuiu (reposicao nao conta como
-     "saiu"). Se o GitHub nao responder (rede bloqueada, limite de uso),
-     a coluna so fica em branco - nao quebra o resto da pagina. */
+  /* ---------------- "Vendido hoje" ----------------
+     O faturamento roda de madrugada (00h-7h), consumindo o estoque de
+     ontem pra gerar o estoque de hoje - entao a diferenca entre a
+     quantidade de ontem e a de hoje e exatamente o que foi vendido hoje
+     de manha. Em vez de guardar isso so no navegador de quem acessa, usa
+     o proprio historico do GitHub: o repositorio guarda cada versao
+     anterior dos arquivos "1707 f1.xls"/"1707 f3.xls" que ja foi
+     enviada. Busca a versao mais recente de um dia anterior a hoje, soma
+     a quantidade de cada produto (por codigo+filial) nela, e compara com
+     a soma de hoje - assim todo mundo que abre o site ve o mesmo
+     "vendido hoje", calculado a partir do mesmo dado compartilhado, sem
+     depender do navegador. So mostra valor quando a quantidade diminuiu
+     (reposicao nao conta como venda). Se o GitHub nao responder (rede
+     bloqueada, limite de uso), a coluna so fica em branco - nao quebra o
+     resto da pagina. */
   var GH_OWNER = 'wesleyboibom', GH_REPO = 'CONTROLE-FEFO', GH_BRANCH = 'main';
   var YESTERDAY_SHA_CACHE_KEY = 'fefo_yesterday_sha_cache_v1';
 
@@ -1288,7 +1292,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     var list = getFiltered();
     var table = document.createElement('table'); table.className = 'print-table';
     var thead = document.createElement('thead'); var trh = document.createElement('tr');
-    ['Produto','Filial','Un.','Disponivel','Saiu (ontem)','Bloqueado','Pendente','Dias a vencer','Validade',
+    ['Produto','Filial','Un.','Disponivel','Vendido hoje','Bloqueado','Pendente','Dias a vencer','Validade',
      'Custo +ICMS (R$)','Preço venda (R$)','Total custo (R$)','Total venda (R$)','Markup %'
     ].forEach(function(txt){ var th = document.createElement('th'); th.textContent = txt; trh.appendChild(th); });
     thead.appendChild(trh); table.appendChild(thead);
@@ -1406,7 +1410,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   }
 
   document.getElementById('btnExportCsv').addEventListener('click', async function(){
-    var header = ['Produto','Filial','Un','Qtd','Saiu (ontem)','Dias a vencer','Validade','Custo +ICMS','Preço venda','Total custo','Total venda','Markup %'];
+    var header = ['Produto','Filial','Un','Qtd','Vendido hoje','Dias a vencer','Validade','Custo +ICMS','Preço venda','Total custo','Total venda','Markup %'];
     var rowOf = function(it){
       var totalCusto = (it.q||0)*(it.c||0);
       var totalVenda = (it.s !== null && it.s !== undefined) ? (it.q||0)*it.s : '';

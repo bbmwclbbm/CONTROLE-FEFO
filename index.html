@@ -884,58 +884,133 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   }
 
   /* ---------------- "Saiu desde ontem" ----------------
-     Guarda, no navegador de quem acessa, a quantidade disponivel de cada
-     lote (produto+filial+validade) no ultimo dia em que a pagina foi
-     aberta antes de hoje. Comparando com a quantidade atual da 1707, da
-     pra ver de cara quanto saiu (vendeu/consumiu) daquele lote desde
-     ontem. So mostra valor quando a quantidade diminuiu - aumento
-     (reposicao) nao conta como "saiu". Fica so neste navegador (nao e
-     compartilhado entre quem acessa de aparelhos diferentes). */
-  var QTY_HISTORY_KEY = 'fefo_qty_history_v1';
+     Em vez de guardar isso so no navegador de quem acessa, usa o proprio
+     historico do GitHub: o repositorio guarda cada versao anterior dos
+     arquivos "1707 f1.xls"/"1707 f3.xls" que ja foi enviada. Busca a
+     versao mais recente de um dia anterior a hoje, soma a quantidade de
+     cada produto (por codigo+filial) nela, e compara com a soma de hoje -
+     assim todo mundo que abre o site ve o mesmo "saiu", calculado a
+     partir do mesmo dado compartilhado, sem depender do navegador. So
+     mostra valor quando a quantidade diminuiu (reposicao nao conta como
+     "saiu"). Se o GitHub nao responder (rede bloqueada, limite de uso),
+     a coluna so fica em branco - nao quebra o resto da pagina. */
+  var GH_OWNER = 'wesleyboibom', GH_REPO = 'CONTROLE-FEFO', GH_BRANCH = 'main';
+  var YESTERDAY_SHA_CACHE_KEY = 'fefo_yesterday_sha_cache_v1';
+
   function todayStr(){
     var d = new Date();
     return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate());
   }
-  function batchKey(it){
-    var code = it.p.split(' - ')[0].trim();
-    return code + '|' + it.f + '|' + (it.v || '');
+  function productKey(p, filial){
+    var code = p.split(' - ')[0].trim();
+    return code + '|' + filial;
   }
-  function applyDailyMovement(){
-    var today = todayStr();
-    var history = [];
-    try{
-      var raw = localStorage.getItem(QTY_HISTORY_KEY);
-      if(raw) history = JSON.parse(raw) || [];
-    }catch(e){ history = []; }
+  function sumQtyByProduct(rows, filial, map){
+    rows.forEach(function(row){
+      if(!row) return;
+      if(row[COL_1707_DEFAULT.cod] === null || row[COL_1707_DEFAULT.cod] === undefined) return;
+      var code = String(row[COL_1707_DEFAULT.cod]).trim().replace(/\.0$/, '');
+      if(code === '') return;
+      var qtd = parseNum(row[COL_1707_DEFAULT.qtd]);
+      if(qtd === null) return;
+      var key = code + '|' + filial;
+      map[key] = (map[key] || 0) + qtd;
+    });
+  }
 
-    var todayEntry = null, prevEntry = null;
-    history.forEach(function(h){
-      if(h.date === today) todayEntry = h; else if(!prevEntry || h.date > prevEntry.date) prevEntry = h;
+  /* Acha, no cache deste navegador, o commit sha ja resolvido hoje pra
+     esse arquivo - evita bater no limite de uso da API do GitHub (60
+     pedidos/hora sem login) quando varias pessoas do mesmo escritorio
+     (mesmo IP) abrem a pagina varias vezes no mesmo dia. */
+  function getCachedYesterdaySha(path){
+    try{
+      var cache = JSON.parse(localStorage.getItem(YESTERDAY_SHA_CACHE_KEY) || '{}');
+      var entry = cache[path];
+      if(entry && entry.date === todayStr()) return entry.sha;
+    }catch(e){}
+    return undefined;
+  }
+  function setCachedYesterdaySha(path, sha){
+    try{
+      var cache = JSON.parse(localStorage.getItem(YESTERDAY_SHA_CACHE_KEY) || '{}');
+      cache[path] = {date: todayStr(), sha: sha};
+      localStorage.setItem(YESTERDAY_SHA_CACHE_KEY, JSON.stringify(cache));
+    }catch(e){}
+  }
+
+  async function getYesterdayCommitSha(path){
+    var cached = getCachedYesterdaySha(path);
+    if(cached !== undefined) return cached;
+    var url = 'https://api.github.com/repos/' + GH_OWNER + '/' + GH_REPO + '/commits?path=' +
+      encodeURIComponent(path) + '&sha=' + GH_BRANCH + '&per_page=30';
+    var r = await fetch(url, {headers: {'Accept': 'application/vnd.github+json'}});
+    if(!r.ok) throw new Error('HTTP ' + r.status + ' ao listar commits de ' + path);
+    var commits = await r.json();
+    var today = todayStr();
+    var sha = null;
+    for(var i=0; i<commits.length; i++){
+      var commitDate = (commits[i].commit && commits[i].commit.author && commits[i].commit.author.date) || '';
+      if(commitDate.slice(0, 10) !== today){ sha = commits[i].sha; break; }
+    }
+    setCachedYesterdaySha(path, sha);
+    return sha;
+  }
+
+  async function fetchRowsAtCommit(path, sha){
+    var url = 'https://raw.githubusercontent.com/' + GH_OWNER + '/' + GH_REPO + '/' + sha + '/' + encodeURIComponent(path);
+    var r = await fetch(url);
+    if(!r.ok) throw new Error('HTTP ' + r.status + ' ao buscar ' + path + ' no commit ' + sha);
+    var buf = await r.arrayBuffer();
+    var wb = XLSX.read(buf, {type:'array', cellDates:true});
+    var sheet = wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:null});
+  }
+
+  async function computeAndApplySaida(){
+    /* So consulta a lista de commits (API com limite de uso) de UM dos
+       arquivos - na pratica o Wesley sempe sobe os 4 arquivos juntos no
+       mesmo commit, entao o mesmo commit vale pros dois 1707. Isso corta
+       pela metade o uso do limite de 60 pedidos/hora sem login, que e
+       compartilhado por todo mundo que acessa da mesma rede. */
+    var prevTotals = {};
+    var anyFound = false;
+    try{
+      var sha = await getYesterdayCommitSha(AUTO_IMPORT_FILES.fefo[0].file);
+      if(sha){
+        for(var i=0; i<AUTO_IMPORT_FILES.fefo.length; i++){
+          var f = AUTO_IMPORT_FILES.fefo[i];
+          try{
+            var rows = await fetchRowsAtCommit(f.file, sha);
+            sumQtyByProduct(rows, f.filial, prevTotals);
+            anyFound = true;
+          }catch(e){
+            console.error('Nao foi possivel buscar a versao anterior de ' + f.file + ' no GitHub:', e);
+          }
+        }
+      }
+    }catch(e){
+      console.error('Nao foi possivel listar o historico do repositorio no GitHub:', e);
+    }
+    if(!anyFound) return;
+
+    var currentTotals = {};
+    items.forEach(function(it){
+      var key = productKey(it.p, it.f);
+      currentTotals[key] = (currentTotals[key] || 0) + (it.q || 0);
     });
 
     items.forEach(function(it){
-      var key = batchKey(it);
-      if(prevEntry && prevEntry.qty.hasOwnProperty(key)){
-        it.saiu = prevEntry.qty[key] - (it.q || 0);
+      var key = productKey(it.p, it.f);
+      if(prevTotals.hasOwnProperty(key)){
+        it.saiu = prevTotals[key] - currentTotals[key];
       } else {
         it.saiu = null;
       }
     });
-
-    var currentQty = {};
-    items.forEach(function(it){ currentQty[batchKey(it)] = it.q || 0; });
-    if(todayEntry){
-      todayEntry.qty = currentQty;
-    } else {
-      history.push({date: today, qty: currentQty});
-    }
-    history.sort(function(a,b){ return a.date < b.date ? 1 : -1; });
-    history = history.slice(0, 2);
-    try{ localStorage.setItem(QTY_HISTORY_KEY, JSON.stringify(history)); }catch(e){}
+    render();
   }
 
   function render(){
-    applyDailyMovement();
     var tbody = document.getElementById('tbody');
     var list = getFiltered();
     tbody.innerHTML = '';
@@ -1693,6 +1768,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       saveItems(); render();
       touchImportMeta(items.length, 'replace');
       renderAutoLoadBanner(costFilesRead.length, fefoFilesRead.length);
+      computeAndApplySaida();
     }catch(e){
       console.error('Leitura automatica dos arquivos do repositorio falhou:', e);
       setAutoLoadBanner('Nao foi possivel buscar os arquivos do repositorio agora.');

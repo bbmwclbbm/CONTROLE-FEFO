@@ -1601,25 +1601,64 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   /* Colunas do 8211 (Controle de Estoque por Custo Financeiro), a partir de 0
      = A: col0=produto (codigo - descricao), col1=un, col4=geral (estoque),
      col7=bloqueado, col8=pendente, col12=custo +ICMS, col14=preco venda. */
+  /* A rotina 8211 ja veio em dois formatos diferentes: o antigo, sem
+     cabecalho, com o produto como "codigo - descricao" numa unica coluna;
+     e um novo, com linha de cabecalho e codigo/descricao em colunas
+     separadas (CODPROD, DESCRICAO, CM+ICMS, PVENDA, UNIDADE, QTBLOQUEADA,
+     QTPENDENTE). Detecta pelo cabecalho em vez de depender de posicao
+     fixa, pra nao quebrar de novo se o relatorio mudar de layout. */
+  function detect8211Cols(rows){
+    var header = rows && rows[0];
+    if(header && Array.isArray(header)){
+      var find = function(name){
+        for(var i=0; i<header.length; i++){
+          if(header[i] !== null && header[i] !== undefined && String(header[i]).trim().toUpperCase() === name) return i;
+        }
+        return -1;
+      };
+      var codCol = find('CODPROD');
+      var custoCol = find('CM+ICMS');
+      var vendaCol = find('PVENDA');
+      if(codCol > -1 && custoCol > -1 && vendaCol > -1){
+        return {
+          hasHeader: true, startRow: 1, codCol: codCol, custoCol: custoCol, vendaCol: vendaCol,
+          unCol: find('UNIDADE'), bloqCol: find('QTBLOQUEADA'), pendCol: find('QTPENDENTE')
+        };
+      }
+    }
+    return {hasHeader: false, startRow: 0};
+  }
+
   function crossReference(costFiles, fefoFiles, cols){
-    var prodCol = cols.prodCol, custoCol = cols.custoCol, vendaCol = cols.vendaCol;
-    var unCol = cols.unCol, bloqCol = cols.bloqCol, pendCol = cols.pendCol;
     var costIndex = {};
     costFiles.forEach(function(cf){
       var filial = cf.filial || guessFilialFromName(cf.name) || '?';
-      cf.rows.forEach(function(row){
-        if(!row || row[prodCol] === null || row[prodCol] === undefined) return;
-        var prodStr = String(row[prodCol]);
-        if(prodStr.indexOf(' - ') === -1) return;
-        var code = prodStr.split(' - ')[0].trim();
+      var dcfg = detect8211Cols(cf.rows);
+      var prodCol = dcfg.hasHeader ? dcfg.codCol : cols.prodCol;
+      var custoCol = dcfg.hasHeader ? dcfg.custoCol : cols.custoCol;
+      var vendaCol = dcfg.hasHeader ? dcfg.vendaCol : cols.vendaCol;
+      var unCol = dcfg.hasHeader ? dcfg.unCol : cols.unCol;
+      var bloqCol = dcfg.hasHeader ? dcfg.bloqCol : cols.bloqCol;
+      var pendCol = dcfg.hasHeader ? dcfg.pendCol : cols.pendCol;
+      for(var r=dcfg.startRow; r<cf.rows.length; r++){
+        var row = cf.rows[r];
+        if(!row || row[prodCol] === null || row[prodCol] === undefined) continue;
+        var code;
+        if(dcfg.hasHeader){
+          code = String(row[prodCol]).trim().replace(/\.0$/, '');
+        } else {
+          var prodStr = String(row[prodCol]);
+          if(prodStr.indexOf(' - ') === -1) continue;
+          code = prodStr.split(' - ')[0].trim();
+        }
         var custo = parseNum(row[custoCol]);
         var venda = parseNum(row[vendaCol]);
-        var un = (unCol !== undefined && row[unCol]) ? String(row[unCol]).trim().toUpperCase() : null;
-        var bloq = bloqCol !== undefined ? parseNum(row[bloqCol]) : null;
-        var pend = pendCol !== undefined ? parseNum(row[pendCol]) : null;
+        var un = (unCol !== undefined && unCol > -1 && row[unCol]) ? String(row[unCol]).trim().toUpperCase() : null;
+        var bloq = (bloqCol !== undefined && bloqCol > -1) ? parseNum(row[bloqCol]) : null;
+        var pend = (pendCol !== undefined && pendCol > -1) ? parseNum(row[pendCol]) : null;
         if(!costIndex[code]) costIndex[code] = [];
         costIndex[code].push({filial: filial, custo: custo, venda: venda, un: un, bloq: bloq, pend: pend});
-      });
+      }
     });
 
     var result = [];

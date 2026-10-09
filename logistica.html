@@ -759,26 +759,64 @@ th#thDias, td.dias-col{text-align:center;}
     return {code: code, desc: desc, qtd: qtd, dias: dias, valid: valid, status: itemStatus};
   }
 
+  /* A rotina 8211 ja veio em dois formatos diferentes: o antigo, sem
+     cabecalho, com o produto como "codigo - descricao" numa unica coluna;
+     e um novo, com linha de cabecalho e codigo/descricao em colunas
+     separadas (CODPROD, DESCRICAO, PVENDA, UNIDADE, QTBLOQUEADA,
+     QTPENDENTE). Detecta pelo cabecalho em vez de depender de posicao
+     fixa, pra nao quebrar de novo se o relatorio mudar de layout. */
+  function detect8211Cols(rows){
+    var header = rows && rows[0];
+    if(header && Array.isArray(header)){
+      var find = function(name){
+        for(var i=0; i<header.length; i++){
+          if(header[i] !== null && header[i] !== undefined && String(header[i]).trim().toUpperCase() === name) return i;
+        }
+        return -1;
+      };
+      var codCol = find('CODPROD');
+      var vendaCol = find('PVENDA');
+      if(codCol > -1 && vendaCol > -1){
+        return {
+          hasHeader: true, startRow: 1, codCol: codCol, vendaCol: vendaCol,
+          unCol: find('UNIDADE'), bloqCol: find('QTBLOQUEADA'), pendCol: find('QTPENDENTE')
+        };
+      }
+    }
+    return {hasHeader: false, startRow: 0};
+  }
+
   /* Cruza os arquivos 8211 (preco tabela/estoque) com os arquivos 1707
      (validade) ja lidos. Nao exibe nem usa o custo +ICMS - so o preco de
      venda (tabela), bloqueado, pendente e unidade. */
   function crossReference(costFiles, fefoFiles){
-    var prodCol = 0, vendaCol = 14, unCol = 1, bloqCol = 7, pendCol = 8;
     var costIndex = {};
     costFiles.forEach(function(cf){
       var filial = cf.filial || '?';
-      cf.rows.forEach(function(row){
-        if(!row || row[prodCol] === null || row[prodCol] === undefined) return;
-        var prodStr = String(row[prodCol]);
-        if(prodStr.indexOf(' - ') === -1) return;
-        var code = prodStr.split(' - ')[0].trim();
+      var dcfg = detect8211Cols(cf.rows);
+      var prodCol = dcfg.hasHeader ? dcfg.codCol : 0;
+      var vendaCol = dcfg.hasHeader ? dcfg.vendaCol : 14;
+      var unCol = dcfg.hasHeader ? dcfg.unCol : 1;
+      var bloqCol = dcfg.hasHeader ? dcfg.bloqCol : 7;
+      var pendCol = dcfg.hasHeader ? dcfg.pendCol : 8;
+      for(var r=dcfg.startRow; r<cf.rows.length; r++){
+        var row = cf.rows[r];
+        if(!row || row[prodCol] === null || row[prodCol] === undefined) continue;
+        var code;
+        if(dcfg.hasHeader){
+          code = String(row[prodCol]).trim().replace(/\.0$/, '');
+        } else {
+          var prodStr = String(row[prodCol]);
+          if(prodStr.indexOf(' - ') === -1) continue;
+          code = prodStr.split(' - ')[0].trim();
+        }
         var venda = parseNum(row[vendaCol]);
-        var un = row[unCol] ? String(row[unCol]).trim().toUpperCase() : null;
-        var bloq = parseNum(row[bloqCol]);
-        var pend = parseNum(row[pendCol]);
+        var un = (unCol > -1 && row[unCol]) ? String(row[unCol]).trim().toUpperCase() : null;
+        var bloq = bloqCol > -1 ? parseNum(row[bloqCol]) : null;
+        var pend = pendCol > -1 ? parseNum(row[pendCol]) : null;
         if(!costIndex[code]) costIndex[code] = [];
         costIndex[code].push({filial: filial, venda: venda, un: un, bloq: bloq, pend: pend});
-      });
+      }
     });
 
     var result = [];

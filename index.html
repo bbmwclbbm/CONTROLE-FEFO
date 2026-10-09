@@ -336,6 +336,9 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       <option value="disponivel">Somente disponivel (no WMS)</option>
     </select>
     <input type="text" id="filBusca" placeholder="Buscar produto...">
+    <select id="filFornecedor">
+      <option value="">Todos os fornecedores</option>
+    </select>
   </div>
 
   <div class="tablewrap">
@@ -765,11 +768,32 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   function baseFiltered(){
     var filFilial = document.getElementById('filFilial').value;
     var busca = document.getElementById('filBusca').value.trim().toLowerCase();
+    var filForn = document.getElementById('filFornecedor').value;
     return items.filter(function(it){
       if(filFilial && String(it.f) !== filFilial) return false;
+      if(filForn && (it.forn || '') !== filForn) return false;
       if(busca && it.p.toLowerCase().indexOf(busca) === -1) return false;
       return true;
     });
+  }
+
+  /* Preenche o filtro de fornecedor com os nomes reais que vieram da 8211
+     nova (campo FORNECEDOR). Arquivos no formato antigo (sem cabecalho) nao
+     tem esse dado - nesse caso a lista fica so com "Todos". Mantem a opcao
+     selecionada se ela continuar existindo depois de reimportar. */
+  function populateFornecedorOptions(){
+    var sel = document.getElementById('filFornecedor');
+    var atual = sel.value;
+    var nomes = {};
+    items.forEach(function(it){ if(it.forn) nomes[it.forn] = true; });
+    var lista = Object.keys(nomes).sort(function(a,b){ return a.localeCompare(b, 'pt-BR'); });
+    sel.innerHTML = '<option value="">Todos os fornecedores</option>';
+    lista.forEach(function(nome){
+      var opt = document.createElement('option');
+      opt.value = nome; opt.textContent = nome;
+      sel.appendChild(opt);
+    });
+    if(lista.indexOf(atual) > -1) sel.value = atual;
   }
 
   function matchesEstoqueFilter(it){
@@ -1015,6 +1039,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   }
 
   function render(){
+    populateFornecedorOptions();
     var tbody = document.getElementById('tbody');
     var list = getFiltered();
     tbody.innerHTML = '';
@@ -1203,6 +1228,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
   document.getElementById('filStatus').addEventListener('change', render);
   document.getElementById('filEstoque').addEventListener('change', render);
   document.getElementById('filBusca').addEventListener('input', render);
+  document.getElementById('filFornecedor').addEventListener('change', render);
   document.getElementById('thDias').addEventListener('click', function(){ sortAsc = !sortAsc; render(); });
 
   document.getElementById('btnAdd').addEventListener('click', function(){
@@ -1622,7 +1648,8 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       if(codCol > -1 && custoCol > -1 && vendaCol > -1){
         return {
           hasHeader: true, startRow: 1, codCol: codCol, custoCol: custoCol, vendaCol: vendaCol,
-          unCol: find('UNIDADE'), bloqCol: find('QTBLOQUEADA'), pendCol: find('QTPENDENTE')
+          unCol: find('UNIDADE'), bloqCol: find('QTBLOQUEADA'), pendCol: find('QTPENDENTE'),
+          fornCol: find('FORNECEDOR')
         };
       }
     }
@@ -1640,6 +1667,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
       var unCol = dcfg.hasHeader ? dcfg.unCol : cols.unCol;
       var bloqCol = dcfg.hasHeader ? dcfg.bloqCol : cols.bloqCol;
       var pendCol = dcfg.hasHeader ? dcfg.pendCol : cols.pendCol;
+      var fornCol = dcfg.hasHeader ? dcfg.fornCol : -1;
       for(var r=dcfg.startRow; r<cf.rows.length; r++){
         var row = cf.rows[r];
         if(!row || row[prodCol] === null || row[prodCol] === undefined) continue;
@@ -1656,8 +1684,10 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
         var un = (unCol !== undefined && unCol > -1 && row[unCol]) ? String(row[unCol]).trim().toUpperCase() : null;
         var bloq = (bloqCol !== undefined && bloqCol > -1) ? parseNum(row[bloqCol]) : null;
         var pend = (pendCol !== undefined && pendCol > -1) ? parseNum(row[pendCol]) : null;
+        var forn = (fornCol !== undefined && fornCol > -1 && row[fornCol] !== null && row[fornCol] !== undefined)
+          ? String(row[fornCol]).trim() : null;
         if(!costIndex[code]) costIndex[code] = [];
-        costIndex[code].push({filial: filial, custo: custo, venda: venda, un: un, bloq: bloq, pend: pend});
+        costIndex[code].push({filial: filial, custo: custo, venda: venda, un: un, bloq: bloq, pend: pend, forn: forn});
       }
     });
 
@@ -1689,7 +1719,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
         var itemStatus = statusRaw.indexOf('AVARIA') > -1 ? 'avaria' : 'normal';
 
         var matches = costIndex[code] || [];
-        var status = 'bad', filial = fileFilial, custo = null, venda = null, un = 'KG', bloq = null, pend = null, note = 'Nao encontrado no 8211';
+        var status = 'bad', filial = fileFilial, custo = null, venda = null, un = 'KG', bloq = null, pend = null, forn = null, note = 'Nao encontrado no 8211';
         var pick = null;
         if(fileFilial){
           var exact = matches.filter(function(m){ return m.filial === fileFilial; });
@@ -1706,10 +1736,10 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
           note = 'Codigo em ' + matches.length + ' filiais - confira';
         }
         if(pick){
-          custo = pick.custo; venda = pick.venda; bloq = pick.bloq; pend = pick.pend;
+          custo = pick.custo; venda = pick.venda; bloq = pick.bloq; pend = pick.pend; forn = pick.forn;
           if(pick.un) un = pick.un;
         }
-        result.push({p: prodStr, f: filial, u: un, q: qtd, d: dias, v: valid, c: custo, s: venda, st: itemStatus, bloq: bloq, pend: pend, status: status, note: note});
+        result.push({p: prodStr, f: filial, u: un, q: qtd, d: dias, v: valid, c: custo, s: venda, st: itemStatus, bloq: bloq, pend: pend, forn: forn, status: status, note: note});
       }
     }
     return {items: result};

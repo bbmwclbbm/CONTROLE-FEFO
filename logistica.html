@@ -246,7 +246,7 @@ th#thDias, td.dias-col{text-align:center;}
           <th>Filial</th>
           <th>Un.</th>
           <th>Disponivel</th>
-          <th>Vendido hoje</th>
+          <th>Venda de ontem</th>
           <th>Bloqueado</th>
           <th>Pendente</th>
           <th id="thDias" style="cursor:pointer">Dias a vencer &#8645;</th>
@@ -646,7 +646,7 @@ th#thDias, td.dias-col{text-align:center;}
   }
 
   document.getElementById('btnExportCsv').addEventListener('click', async function(){
-    var header = ['Produto','Filial','Un','Disponivel','Vendido hoje','Bloqueado','Pendente','Dias a vencer','Validade','Preco tabela'];
+    var header = ['Produto','Filial','Un','Disponivel','Venda de ontem','Bloqueado','Pendente','Dias a vencer','Validade','Preco tabela'];
     var rowOf = function(it){
       var saiu = (it.saiu !== null && it.saiu !== undefined && it.saiu > 0) ? it.saiu : '';
       return [it.p, it.f, it.u, it.q, saiu, it.bloq || '', it.pend || '', it.d, it.v, it.s === null || it.s === undefined ? '' : it.s].join(';');
@@ -707,7 +707,7 @@ th#thDias, td.dias-col{text-align:center;}
     var list = getFiltered();
     var table = document.createElement('table'); table.className = 'print-table';
     var thead = document.createElement('thead'); var trh = document.createElement('tr');
-    ['Produto','Filial','Un.','Disponivel','Vendido hoje','Bloqueado','Pendente','Dias a vencer','Validade']
+    ['Produto','Filial','Un.','Disponivel','Venda de ontem','Bloqueado','Pendente','Dias a vencer','Validade']
       .forEach(function(txt){ var th = document.createElement('th'); th.textContent = txt; trh.appendChild(th); });
     thead.appendChild(trh); table.appendChild(thead);
 

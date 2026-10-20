@@ -466,6 +466,9 @@ th#thDias, td.dias-col{text-align:center;}
       if(row[COL_1707_DEFAULT.cod] === null || row[COL_1707_DEFAULT.cod] === undefined) return;
       var code = String(row[COL_1707_DEFAULT.cod]).trim().replace(/\.0$/, '');
       if(code === '') return;
+      var statusRaw = (row[COL_1707_DEFAULT.status] !== null && row[COL_1707_DEFAULT.status] !== undefined)
+        ? String(row[COL_1707_DEFAULT.status]).trim().toUpperCase() : '';
+      if(statusRaw.indexOf('AVARIA') > -1) return;
       var qtd = parseNum(row[COL_1707_DEFAULT.qtd]);
       if(qtd === null) return;
       var key = code + '|' + filial;

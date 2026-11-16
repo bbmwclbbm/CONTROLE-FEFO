@@ -1033,7 +1033,11 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     items.forEach(function(it){
       var key = productKey(it.p, it.f);
       if(prevTotals.hasOwnProperty(key)){
-        it.saiu = prevTotals[key] - currentTotals[key];
+        /* Arredonda pra 3 casas - soma de varios floats (parseFloat por
+           linha) gera ruido de ponto flutuante tipo 22.680000000000007,
+           que o Excel em pt-BR le errado (confunde o ponto com separador
+           de milhar) e mostra um numero gigante absurdo. */
+        it.saiu = Math.round((prevTotals[key] - currentTotals[key]) * 1000) / 1000;
       } else {
         it.saiu = null;
       }
@@ -1438,15 +1442,26 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);marg
     return tr;
   }
 
+  /* Formata numero pra CSV com virgula decimal (padrao BR) - o arquivo ja usa
+     ";" como separador de coluna (padrao BR), entao os numeros tambem
+     precisam usar "," decimal, senao o Excel (configurado em pt-BR) le o
+     ponto como separador de milhar e mostra um valor absurdo. */
+  function csvNum(n, decimals){
+    if(n === null || n === undefined || n === '') return '';
+    var num = Number(n);
+    if(isNaN(num)) return '';
+    return num.toFixed(decimals).replace('.', ',');
+  }
+
   document.getElementById('btnExportCsv').addEventListener('click', async function(){
     var header = ['Produto','Filial','Un','Qtd','Venda de ontem','Dias a vencer','Validade','Custo +ICMS','Preço venda','Total custo','Total venda','Markup %'];
     var rowOf = function(it){
       var totalCusto = (it.q||0)*(it.c||0);
-      var totalVenda = (it.s !== null && it.s !== undefined) ? (it.q||0)*it.s : '';
+      var totalVenda = (it.s !== null && it.s !== undefined) ? (it.q||0)*it.s : null;
       var temPreco = (it.s !== null && it.s !== undefined && it.c);
-      var markup = temPreco ? ((it.s-it.c)/it.c*100).toFixed(1) : '';
-      var saiu = (it.saiu !== null && it.saiu !== undefined && it.saiu > 0) ? it.saiu : '';
-      return [it.p, it.f, it.u, it.q, saiu, it.d, it.v, it.c, it.s === null ? '' : it.s, totalCusto.toFixed(2), totalVenda === '' ? '' : totalVenda.toFixed(2), markup].join(';');
+      var markup = temPreco ? ((it.s-it.c)/it.c*100) : null;
+      var saiu = (it.saiu !== null && it.saiu !== undefined && it.saiu > 0) ? it.saiu : null;
+      return [it.p, it.f, it.u, csvNum(it.q,3), csvNum(saiu,3), it.d, it.v, csvNum(it.c,2), csvNum(it.s,2), csvNum(totalCusto,2), csvNum(totalVenda,2), csvNum(markup,1)].join(';');
     };
     var groups = splitVigor(getFiltered());
     var rows = [header.join(';')];
